@@ -1,0 +1,19 @@
+
+[mysqld]
+
+sql-mode=""
+innodb_flush_log_at_trx_commit=2
+sync_binlog=0
+innodb_flush_method=O_DIRECT
+transaction-isolation=READ-COMMITTED
+innodb_strict_mode=OFF
+
+#TODO!!! check
+#performance-schema = false
+#table_open_cache = 1024
+#thread_cache_size = 4
+#query_cache_size = 32M
+#query_cache_type = 1
+#tmp_table_size = 128M
+#max_heap_table_size = 128M
+#innodb_buffer_pool_size = 1024M

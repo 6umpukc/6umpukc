@@ -1,0 +1,4 @@
+
+DROP USER IF EXISTS bitrixuser1;
+
+DROP DATABASE IF EXISTS bitrixdb1;

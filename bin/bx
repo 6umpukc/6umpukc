@@ -1,0 +1,853 @@
+#!/usr/bin/env perl
+
+use 5.016;
+use warnings;
+use FindBin qw($RealBin $Bin $Script);
+use Cwd qw(cwd getcwd);
+use File::Basename;
+use File::Copy;
+use File::Path qw(make_path remove_tree);
+use File::Find qw(finddepth);
+use Config;
+
+use lib "$RealBin/vendor/lib/perl5";
+use Text::CSV;
+
+# common functions
+
+sub init_default_env {
+	$ENV{'PHP_URLS_WIN32'} = 'https://windows.php.net/downloads/releases/php-8.2.22-Win32-vs16-x86.zip';
+	$ENV{'PHP_URLS_WIN64'} = 'https://windows.php.net/downloads/releases/php-8.2.22-Win32-vs16-x64.zip';
+	$ENV{'PHP_URLS_MACOS'} = '';
+	$ENV{'PHP_URLS_LINUX'} = '';
+
+	$ENV{'NODE_URLS_WIN32'} = 'https://nodejs.org/dist/v20.16.0/node-v20.16.0-win-x86.zip';
+	$ENV{'NODE_URLS_WIN64'} = 'https://nodejs.org/dist/v20.16.0/node-v20.16.0-win-x64.zip';
+	$ENV{'NODE_URLS_MACOS'} = 'https://nodejs.org/dist/v20.16.0/node-v20.16.0-darwin-x64.tar.gz';
+	$ENV{'NODE_URLS_LINUX'} = 'https://nodejs.org/dist/v20.16.0/node-v20.16.0-linux-x64.tar.gz';
+
+	$ENV{'BITRIX_SRC_MICRO'} = 'https://www.1c-bitrix.ru/download/start_encode_php5.tar.gz';
+	$ENV{'BITRIX_SRC_CORE'} = 'https://www.1c-bitrix.ru/download/start_encode_php5.tar.gz';
+	$ENV{'BITRIX_SRC_START'} = 'https://www.1c-bitrix.ru/download/start_encode_php5.tar.gz';
+	$ENV{'BITRIX_SRC_BUSINESS'} = 'https://www.1c-bitrix.ru/download/business_encode_php5.tar.gz';
+	$ENV{'BITRIX_SRC_CRM'} = 'https://www.1c-bitrix.ru/download/portal/bitrix24_encode_php5.tar.gz';
+	$ENV{'BITRIX_SRC_SETUP'} = 'https://www.1c-bitrix.ru/download/scripts/bitrixsetup.php';
+	$ENV{'BITRIX_SRC_RESTORE'} = 'https://www.1c-bitrix.ru/download/scripts/restore.php';
+	$ENV{'BITRIX_SRC_TEST'} = 'https://dev.1c-bitrix.ru/download/scripts/bitrix_server_test.php';
+
+	$ENV{'BX_MKCERT'} = 'bx.local *.bx.local';
+
+	#$ENV{'DIR_PUBLIC'} = '/public/';
+	$ENV{'DIR_PUBLIC'} = '/';
+
+	#$ENV{'SITE_DIR_USER'} = 'www-data:www-data';
+	$ENV{'SITE_DIR_RIGHTS'} = '0775';
+
+	$ENV{'DIR_LOCAL_SITES'} = $ENV{'HOME'} . '/Local Sites/';
+}
+
+sub detect_site_root {
+	my $path = shift;
+	if ($path eq '') {
+		$path = getcwd();
+	}
+	if (-f "$path/.env") {
+		return $path;
+	}
+	if ($path ne '' && ($path ne dirname $path)) {
+		return detect_site_root(dirname $path);
+	}
+	return '';
+}
+
+sub load_env {
+	my $path = shift;
+	if (!-f $path) {
+		return;
+	}
+	my %result = ();
+
+	my @lines = split("\n", file_get_contents($path));
+	for my $line (@lines)
+	{
+		my @row = split('=', trim($line));
+		if ((scalar @row) == 0)
+		{
+			next;
+		}
+
+		my $key = $row[0];
+		if ($key eq '') {
+			next;
+		}
+		if (substr($key, 0, 1) eq '#') {
+			next;
+		}
+
+		my $value = unquote($row[1]);
+
+		$result{$key} = $value;
+		$ENV{$key} = $value;
+	}
+
+	return %result;
+}
+
+sub is_mingw() {
+    my $msystem = exists $ENV{'MSYSTEM'} ? $ENV{'MSYSTEM'} : '';
+    if (($msystem eq 'MINGW64') or ($msystem eq 'MINGW32') or ($msystem eq 'MSYS')) {
+        return 1;
+    }
+    return 0;
+}
+
+sub is_windows_32bit {
+	return (index($ENV{'PROCESSOR_ARCHITECTURE'}, 'x86') >= 0)? 1 : 0;
+}
+
+sub file_get_contents {
+    my $filename = shift;
+    my $result = '';
+    if (open(my $fh, '<:encoding(UTF-8)', $filename)) {
+        while (my $line = <$fh>) {
+            $result .= $line;
+        }
+    }
+    return $result;
+}
+
+sub file_put_contents {
+    my $filename = shift;
+    my $content = shift;
+    if (open(my $fh, '>:encoding(UTF-8)', $filename)) {
+        print $fh $content;
+        close $fh;
+        return 1;
+    }
+    return 0;
+}
+
+sub trim {
+    my $s = shift;
+    $s =~ s/^\s+|\s+$//g;
+    return $s;
+}
+
+sub unquote {
+	my $s = shift;
+	my $start = substr($s, 0, 1);
+	my $end = substr($s, -1, 1);
+	while ((length($s) > 1) && ($start eq $end))
+	{
+		$s = substr($s, 1, -1);
+		$start = substr($s, 0, 1);
+		$end = substr($s, -1, 1);
+	}
+	return $s;
+}
+
+sub is_wsl {
+	return ((exists $ENV{'IS_WSL'})
+		or (exists $ENV{'WSL_DISTRO_NAME'}));
+}
+
+sub confirm_continue {
+    my $title = shift;
+    print $title . " Type 'yes' to continue: ";
+    my $line = <STDIN>;
+    chomp $line;
+    return trim($line) eq 'yes';
+}
+
+sub check_command {
+	my $cmd = shift;
+	my $test = 'which ' . $cmd;
+	my $res = qx($test);
+	my $path = trim($res);
+	if (index($path, '/mnt/c/') >= 0) {
+		if (is_wsl()) {
+			# skip windows executable from WSL
+			return 0;
+		}
+	}
+
+    if ($path eq '') {
+        return 0;
+    }
+    return 1;
+}
+
+sub require_command {
+    my $cmd = shift;
+    my $test = 'which ' . $cmd;
+    if (qx{$test} eq '') {
+        die('[' . $cmd . '] command - not found.');
+    }
+}
+
+sub require_file {
+    my $fname = shift;
+	my $info = shift || '';
+    if (!-f $fname) {
+        die($info . ' [' . $fname . '] file - not found.');
+    }
+}
+
+sub ziparchive_extract {
+    require_command('unzip');
+
+	my ($src, $dest) = @_;
+	my $result = '';
+	my $cmd = "unzip -o '$src' -d '$dest'";
+	$result = qx{$cmd};
+	return $result;
+}
+
+sub request_useragent {
+    return 'Mozilla/5.0 (X11; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0';
+}
+
+sub request_get {
+    require_command('curl');
+
+    my ($url, $outfile) = @_;
+    my $result = '';
+    my $cmd = "curl -L '$url'"
+        . " -A '" . request_useragent() . "'";
+    if ($outfile && ($outfile ne '')) {
+        $cmd .= " -o '$outfile'";
+    }
+    $result = qx{$cmd};
+    return $result;
+}
+
+sub is_bx_debug() {
+	return (exists $ENV{'BX_DEBUG'} && ($ENV{'BX_DEBUG'} eq '1'));
+}
+
+sub is_ubuntu {
+	my $os = $Config{'myuname'};
+	return (index($os, 'debian') > 0
+		|| index($os, 'ubuntu') >= 0
+		|| index($os, 'Ubuntu') >= 0);
+}
+
+sub run {
+	my $cmd = shift;
+	my $sudo = shift;
+	if (!defined($sudo) || $sudo ne 'sudo') {
+		$sudo = '';
+	}
+	$cmd = trim($sudo . ' ' . $cmd);
+	if (is_bx_debug()) {
+		say '';
+		say $cmd;
+	}
+	return system($cmd);
+}
+
+sub sudo {
+	my $cmd = shift;
+	my $sudo = '';
+	if (is_ubuntu()) {
+		$sudo = 'sudo';
+	}
+	if (exists $ENV{'BX_ROOT_USER'} && ($ENV{'BX_ROOT_USER'} eq '1')) {
+		$sudo = '';
+	}
+	return run($cmd, $sudo);
+}
+
+sub patch_file {
+	my $fname = shift;
+	my $fixContent = shift;
+
+	if (-f $fname) {
+		my $originalContent = file_get_contents($fname);
+		if (index($originalContent, $fixContent) < 0) {
+			file_put_contents($fname, $originalContent . "\n" . $fixContent . "\n");
+		}
+	}
+	else {
+		file_put_contents($fname, "\n" . $fixContent . "\n");
+	}
+}
+
+sub sudo_patch_file {
+	my $fname = shift;
+	my $content = shift;
+	if (! -f $fname) {
+		return;
+	}
+	my $path = $ENV{'HOME'};
+	my $tmp = $path . '/.patch.' . basename($fname) . '.tmp';
+	my $originalContent = file_get_contents($fname);
+	if (index($originalContent, $content) < 0) {
+		$content = $originalContent . "\n" . $content . "\n";
+		file_put_contents($tmp, $content);
+		sudo("mv '" . $tmp . "' " . $fname);
+	}
+}
+
+sub download_binaries {
+	my $urlPrefix = shift;
+	my $downloadPath = shift;
+	my $destPath = shift;
+
+	if (!$destPath) {
+		$destPath = $downloadPath;
+	}
+
+	my $srcUrl = '';
+	if (is_mingw()) {
+		if (is_windows_32bit()) {
+			$srcUrl = $ENV{$urlPrefix . '_WIN32'};
+		}
+		else {
+			$srcUrl = $ENV{$urlPrefix . '_WIN64'};
+		}
+	}
+	elsif (is_ubuntu()) {
+		$srcUrl = $ENV{$urlPrefix . '_LINUX'};
+	}
+	else {
+		$srcUrl = $ENV{$urlPrefix . '_MACOS'};
+	}
+
+	if ($srcUrl eq '') {
+		say 'Url for ' . $urlPrefix . ' not defined.';
+		return '';
+	}
+
+	my $outputFile = $downloadPath . '/' . basename($srcUrl);
+	say "Loading $srcUrl ...";
+	request_get($srcUrl, $outputFile);
+
+	say "Extracting $outputFile ...";
+	ziparchive_extract($outputFile, $destPath);
+
+	return $outputFile;
+}
+
+sub require_site_root {
+	my $basePath = shift;
+	if ($basePath eq '') {
+		die "Site root not found.\n";
+	}
+}
+
+sub ftp_conn_str {
+	return $ENV{'DEPLOY_METHOD'} . '://'
+		. $ENV{'DEPLOY_USER'} . ':' . $ENV{'DEPLOY_PASSWORD'}
+		. '@' . $ENV{'DEPLOY_SERVER'} . $ENV{'DEPLOY_PORT'} . $ENV{'DEPLOY_PATH'};
+}
+
+sub get_ssh_command {
+  if (!exists $ENV{'DEPLOY_SERVER'} || ($ENV{'DEPLOY_SERVER'} eq '')) {
+    return '';
+  }
+
+  my $port = $ENV{'DEPLOY_PORT'};
+  if ($port ne '') {
+    $port = ' -p' . substr($port, 1);
+  }
+
+  my $key = '';
+  if (exists $ENV{'DEPLOY_KEY'} && ($ENV{'DEPLOY_KEY'} ne '')) {
+    $key = ' -i ' . $ENV{'DEPLOY_KEY'} . ' ';
+  }
+
+  return 'ssh ' . $key . $ENV{'DEPLOY_USER'} . '@' . $ENV{'DEPLOY_SERVER'} . $port;
+}
+
+sub escape_shell_arg
+{
+    my $s = shift;
+    $s =~ s/\$/\\\$/g;
+	return $s;
+}
+
+sub ssh_exec_remote {
+	my $cmd = shift;
+	if (!$cmd || $cmd eq '') {
+		$cmd = 'bash --login';
+	}
+	my $port = $ENV{'DEPLOY_PORT'};
+	if ($port ne '') {
+		$port = ' -p' . substr($port, 1);
+	}
+
+	my $result = '';
+	if (exists $ENV{'DEPLOY_PASSWORD'} && ($ENV{'DEPLOY_PASSWORD'} ne '')) {
+		$result .= 'sshpass -p "' . escape_shell_arg($ENV{'DEPLOY_PASSWORD'}) . '" ';
+	}
+	my $key = '';
+	if (exists $ENV{'DEPLOY_KEY'} && ($ENV{'DEPLOY_KEY'} ne '')) {
+		$key = ' -i ' . $ENV{'DEPLOY_KEY'} . ' ';
+	}
+	$result .= 'ssh ' . $key . $ENV{'DEPLOY_USER'} . '@' . $ENV{'DEPLOY_SERVER'} . $port
+		. ' -t "';
+	if (exists $ENV{'DEPLOY_PATH'} && ($ENV{'DEPLOY_PATH'} ne '')) {
+		$result .= 'cd ' . $ENV{'DEPLOY_PATH'} . ' && ';
+	}
+	$result .= $cmd;
+	$result .= '"';
+
+	return $result;
+}
+
+sub get_putty_command {
+	my $profile = shift;
+
+	if (!exists $ENV{'DEPLOY_SERVER'} || ($ENV{'DEPLOY_SERVER'} eq '')) {
+		return '';
+	}
+	my $port = $ENV{'DEPLOY_PORT'};
+	if ($port ne '') {
+		$port = ' -P ' . substr($port, 1);
+	}
+
+	return 'putty ' . ($profile? ' -load ' : ($ENV{'DEPLOY_USER'} . '@')) . $ENV{'DEPLOY_SERVER'} . $port;
+}
+
+sub putty_exec_remote {
+	my $cmd = shift;
+	my $profile = shift;
+
+	if (!$cmd || $cmd eq '') {
+		$cmd = 'bash --login';
+	}
+	my $port = $ENV{'DEPLOY_PORT'};
+	if ($port ne '') {
+		$port = ' -P ' . substr($port, 1);
+	}
+
+	my $result = get_putty_command($profile);
+
+	if (exists $ENV{'DEPLOY_PASSWORD'} && ($ENV{'DEPLOY_PASSWORD'} ne '')) {
+		$result .= " -pw '" . $ENV{'DEPLOY_PASSWORD'} . "'";
+	}
+
+	#plink -ssh user@host -pw password echo "hi"
+
+	return $result;
+}
+
+sub get_site_config {
+	my $sitehost = shift;
+	return '/etc/apache2/sites-available/' + $sitehost + '.conf';
+}
+
+sub require_site_config {
+	my $sitehost = shift;
+	require_file(
+		get_site_config($sitehost),
+		"Config for site $sitehost not exists."
+	);
+}
+
+sub install_php {
+	my $version = shift || '';
+	sudo('apt install'
+		. " php$version"
+		. " php$version-fpm"
+		. " php$version-mysql"
+		. " php$version-mbstring"
+		. " php$version-opcache"
+		. " php$version-zip"
+		. " php$version-xml"
+		. " php$version-curl"
+		. " php$version-gd"
+		. " php$version-sqlite3"
+		. " php$version-imagick"
+		. " php$version-xdebug"
+	);
+
+	# patch configs
+	my $phpContent = file_get_contents(dirname($RealBin) . '/.template/bitrix.php.ini');
+	my @phpDirs = glob('/etc/php/*');
+	my @tmp = map { basename($_) } sort { $b cmp $a } @phpDirs;
+
+	for my $phpVersion (@tmp) {
+		if (($version eq '') || ($version eq $phpVersion))
+		{
+			say "Patch $phpVersion for Bitrix...";
+			sudo_patch_file('/etc/php/' . $phpVersion . '/apache2/php.ini', $phpContent);
+			sudo_patch_file('/etc/php/' . $phpVersion . '/fpm/php.ini', $phpContent);
+			sudo_patch_file('/etc/php/' . $phpVersion . '/cli/php.ini', $phpContent);
+		}
+	}
+}
+
+# actions
+
+sub action_install_php {
+	#if (check_command('php')) {
+	#	return;
+    #}
+	if (is_mingw()) {
+		my $homeBin = $ENV{'HOME'} . '/bin';
+		my $destPath = $homeBin . '/php';
+		my $outputFile = download_binaries('PHP_URLS', $homeBin, $destPath);
+		if (-f $outputFile) {
+			unlink($outputFile);
+		}
+		patch_file($ENV{'HOME'} . '/.profile', 'PATH=$HOME/bin/php:$PATH');
+		#$ENV{'PATH'} = $ENV{'HOME'} . '/bin/php:' . $ENV{'PATH'};
+	} elsif (is_ubuntu()) {
+		my $phpVersion = defined $ARGV[1]? $ARGV[1] : '';
+		install_php($phpVersion);
+	}
+	#TODO!!! add to windows PATH
+}
+
+sub action_install_mkcert {
+	#TODO!!! fix
+    if (is_ubuntu()) {
+		my $certKeyName = (exists $ENV{'BX_MKCERT'} && ($ENV{'BX_MKCERT'} ne ''))?
+			$ENV{'BX_MKCERT'} : 'bx.local *.bx.local';
+		$certKeyName = join(' ', map { '"' . $_ . '"' } split(/\s+/, $certKeyName));
+
+		sudo('apt install libnss3-tools');
+    	sudo('snap install go --classic');
+    	run('rm -Rf ~/bin/mkcert-src/');
+    	run('git clone https://github.com/FiloSottile/mkcert ~/bin/mkcert-src');
+    	run('cd ~/bin/mkcert-src/ && go build -ldflags "-X main.Version=$(git describe --tags)" && mv mkcert ~/bin/mkcert');
+    	run('mkcert -install');
+    	run('mkdir ~/.ssl/ && cd ~/.ssl/ && mkcert ' . $certKeyName);
+    	sudo('a2enmod ssl');
+    }
+}
+
+sub action_install_lamp {
+	if (is_ubuntu()) {
+		say '';
+		say '# Install php, apache2, mysql and tools...';
+
+        sudo('apt install software-properties-common -y');
+		sudo('add-apt-repository ppa:ondrej/php');
+
+		sudo('apt-get update -y');
+
+		sudo('apt install unzip wget curl dos2unix pwgen sshpass screen');
+		sudo('apt install'
+			. ' apache2 libapache2-mod-fcgid'
+            . ' mysql-server mysql-client'
+            . ' php libapache2-mod-php'
+        );
+
+		install_php();
+
+		# sudo adduser bitrix www-data
+		sudo('usermod -a -G www-data ' . $ENV{'USER'});
+		sudo('chmod 755 ~/');
+		run('chmod +x /home/' . $ENV{'USER'});
+		my $homePath = $ENV{'HOME'};
+		my $extWww = $homePath . '/ext_www';
+		if (! -d $extWww) {
+			mkdir $extWww;
+		}
+
+		#TODO!!! patch  /etc/apache2/apache2.conf -> <Directory /> -> AllowOverride All
+		say 'Add to /etc/apache2/apache2.conf -> <Directory />';
+		say '	AllowOverride All';
+		say '	Require all granted';
+		say '';
+
+        sudo('apt install msmtp');
+        sudo('apt install optipng jpegoptim pngquant');
+        #sudo('apt install rinetd');
+
+		sudo('a2enmod php');
+
+		sudo('a2enmod actions');
+		sudo('a2enmod fcgid');
+		sudo('a2enmod alias');
+		sudo('a2enmod proxy_fcgi');
+
+		sudo('a2enmod rewrite');
+		sudo('a2enmod proxy');
+		sudo('a2enmod proxy_http');
+
+		#sudo('snap install node --classic');
+
+		#TODO!!! версии ниже ?7.2 не работают с mysql8 из коробки
+        #sudo('apachectl configtest')
+        # global switch php (для основной версии mod_php)
+        #sudo('a2dismod php7.4')
+        #sudo('a2enmod php')
+
+		say '';
+		say '# Mysql config setup...';
+		sudo('mysql_secure_installation');
+		say '';
+		say '# Mysql config check...';
+		sudo('mysqladmin -p -u root version');
+
+		my $mysqlContent = file_get_contents(dirname($RealBin) . '/.template/ubuntu/bitrix.my.cnf');
+		sudo_patch_file('/etc/mysql/my.cnf', $mysqlContent);
+
+		say '';
+		say '# Mail sender setup...';
+		copy(dirname($RealBin) . '/.template/.msmtprc', $homePath . '/.msmtprc');
+		sudo('chown www-data:www-data ' . $homePath . '/.msmtprc');
+		sudo('chmod 0600 ' . $homePath . '/.msmtprc');
+		if (-f '/etc/msmtprc') {
+			sudo('unlink /etc/msmtprc');
+		}
+		sudo('ln -s ' . $homePath . '/.msmtprc /etc/msmtprc');
+
+		say '';
+		say '# Setup locale for windows-1251...';
+		sudo('locale-gen ru_RU.CP1251');
+		sudo('dpkg-reconfigure locales');
+
+		# check locale:
+		#	`locale -a | grep ru`
+		#	`less /usr/share/i18n/SUPPORTED | grep ru_RU | grep CP1251`
+		# for centos:
+		#	`localedef -c -i ru_RU -f CP1251 ru_RU.CP1251`
+	}
+}
+
+sub action_install {
+	my $homeBin = $ENV{'HOME'} . '/bin';
+    if (!-d $homeBin) {
+        mkdir($homeBin);
+    }
+
+	my $fnameEnv = dirname($RealBin) . '/.env';
+	if (!(-f $fnameEnv)) {
+		copy(dirname($RealBin) . '/.env.example', $fnameEnv);
+	}
+
+	if (is_mingw()) {
+		patch_file($ENV{'HOME'} . '/.profile', 'export MSYS=winsymlinks:native');
+    }
+
+	my $homeScript = $homeBin . '/' . $Script;
+	if (-l $homeScript) {
+		unlink($homeScript);
+	}
+	symlink($RealBin . '/' . $Script, $homeScript);
+
+	action_install_php();
+}
+
+sub action_env {
+	my $basePath = shift;
+	require_site_root($basePath);
+
+	our %config;
+	say "Site root:\n\t$basePath\n";
+
+	say "FTP:\n\t" . ftp_conn_str();
+	say '';
+
+	my $connStr = get_ssh_command();
+	if ($connStr ne '') {
+		say 'SSH:';
+		say "\t" . $connStr;
+		say "\t" . ssh_exec_remote();
+		say '';
+		say "\t" . get_putty_command();
+		say "\t" . putty_exec_remote();
+		say "\t" . get_putty_command(1);
+		say "\t" . putty_exec_remote('', 1);
+
+		say "\t" . get_filezilla_command(ftp_conn_str(), $basePath);
+
+		say '';
+	}
+
+	say 'ENV config:';
+	for my $k (keys %config) {
+		say "    $k -> " . $ENV{$k};
+	}
+}
+
+sub path2wsl {
+	my $path = shift;
+
+	my $distroName = exists $ENV{'WSL_DISTRO_NAME'}? $ENV{'WSL_DISTRO_NAME'} : 'Ubuntu';
+	my $result = '\\\wsl.localhost\\' . $distroName . $path;
+
+	return $result;
+}
+
+sub get_filezilla_command {
+	my $conn_str = shift;
+	my $basePath = shift;
+	my $exePath = shift;
+
+	if (!$exePath || ($exePath eq '')) {
+		$exePath = 'filezilla';
+	}
+
+	if (is_wsl())
+	{
+		$basePath = path2wsl($basePath);
+	}
+
+	return $exePath . " '" . $conn_str . "' --local='" . $basePath . "'";
+}
+
+sub action_ftp {
+	my $basePath = shift;
+	require_site_root($basePath);
+
+	my $path;
+	my $conn_str = ftp_conn_str();
+	if (is_mingw()) {
+		run 'start ' . get_filezilla_command($conn_str, $basePath);
+	} elsif (is_wsl()) {
+		#TODO!!!
+		die('TODO!!! convert path for wsl');
+		run 'cmd.exe /c start ' . get_filezilla_command($conn_str, $basePath);
+	} else {
+		require_command('filezilla');
+		if (`which screen`) {
+			# ubuntu
+			run get_filezilla_command($conn_str, $basePath, 'screen -d -m filezilla');
+		} else {
+			# arch
+			run '(' . get_filezilla_command($conn_str, $basePath) . ' &> /dev/null &)';
+		}
+	}
+}
+
+sub action_ssh {
+	my $basePath = shift;
+	require_site_root($basePath);
+	require_command('ssh');
+	require_command('sshpass');
+
+	run ssh_exec_remote();
+}
+
+sub action_putty {
+	my $basePath = shift;
+	require_site_root($basePath);
+	require_command('putty');
+
+	run putty_exec_remote('', 1);
+}
+
+sub service {
+	my $action = shift;
+	my $name = shift;
+	if (is_wsl()) {
+		sudo("service $name $action");
+	} else {
+		sudo("systemctl $action $name");
+	}
+}
+
+sub action_start {
+	if (is_ubuntu()) {
+		service('start', 'apache2');
+		service('start', 'mysql');
+
+        if (check_command('rinetd')) {
+            sudo('service rinetd restart');
+		}
+	} else {
+		sudo('systemctl start httpd.service mysqld.service');
+	}
+}
+
+sub action_stop {
+	if (is_ubuntu()) {
+		service('stop', 'apache2');
+		service('stop', 'mysql');
+
+        if (check_command('rinetd')) {
+			sudo('service rinetd stop');
+		}
+	} else {
+		sudo('systemctl stop httpd.service mysqld.service');
+	}
+}
+
+# main
+
+our $site_root = detect_site_root('');
+
+# load env
+init_default_env();
+our %config = load_env($site_root . '/.env');
+my $envPrefix = '';
+if (exists $ENV{'BX_ENV'}) {
+	$envPrefix = $ENV{'BX_ENV'};
+}
+if ($envPrefix ne '') {
+	my $envFname = $site_root . '/.env.' . $envPrefix;
+	require_file($envFname, 'ENV');
+	my %config2 = load_env($envFname);
+	for my $k (keys %config2) {
+		$config{$k} = $config2{$k};
+	}
+}
+
+# process commands
+my %actions = (
+	'install' => {
+		'fn' => \&action_install,
+	},
+
+	'install-php' => {
+		'fn' => \&action_install_php,
+	},
+
+	'install-lamp' => {
+		'fn' => \&action_install_lamp,
+	},
+
+	'env' => {
+		'fn' => \&action_env,
+	},
+
+	'ftp' => {
+		'fn' => \&action_ftp,
+	},
+
+	'ssh' => {
+		'fn' => \&action_ssh,
+	},
+
+	'putty' => {
+		'fn' => \&action_putty,
+	},
+
+	'start' => {
+		'fn' => \&action_start,
+	},
+
+	'stop' => {
+		'fn' => \&action_stop,
+	},
+);
+
+my $action = '';
+my $actionNotExists = 0;
+if (scalar @ARGV > 0) {
+	$action = $ARGV[0];
+} else {
+	$action = 'help';
+	$actionNotExists = 1;
+}
+if ($action ne '') {
+	if (exists $actions{$action}) {
+		my $actionFn = $actions{$action}->{'fn'};
+		$actionFn->($site_root);
+	} else {
+		my $args = join(' ', @ARGV);
+		my $cliPath = dirname($RealBin) . '/include.php';
+		$ENV{'DOCUMENT_ROOT'} = $site_root;
+		if ($actionNotExists == 1)
+		{
+			$args = $action;
+		}
+		run "php '$cliPath' '$site_root' $args";
+	}
+}

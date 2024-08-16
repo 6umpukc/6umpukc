@@ -2,6 +2,9 @@
 
 namespace Rodzeta\Siteoptions\Action;
 
+use Rodzeta\Siteoptions\Base;
+use Rodzeta\Siteoptions\Shell;
+use Rodzeta\Siteoptions\Config;
 use RecursiveIteratorIterator;
 use RecursiveDirectoryIterator;
 
@@ -20,10 +23,10 @@ final class Siteinit extends Base
 	public function addSite($siteconf)
 	{
 		$publicPath = $this->getPublicPath();
-		$currentUser = $this->getUser();
+		$currentUser = Shell::getUser();
 		$sitehost = $this->getSiteHost();
 
-		$siteconf = $this->getRealBinPath() . '/.template/ubuntu/' . $siteconf;
+		$siteconf = Shell::getRealBinPath() . '/.template/ubuntu/' . $siteconf;
 
 		$content = file_get_contents($siteconf);
 		$content = str_replace('/home/user/ext_www/bitrix-site.com', $publicPath, $content);
@@ -47,7 +50,7 @@ final class Siteinit extends Base
 
 	protected function addDatabase($dbconf, $dbname, $dbpassword)
 	{
-		$dbconf = $this->getRealBinPath() . '/.template/ubuntu/' . $dbconf;
+		$dbconf = Shell::getRealBinPath() . '/.template/ubuntu/' . $dbconf;
 		$sqlContent = file_get_contents($dbconf);
 
 		$sqlContent = str_replace('bitrixdb1', $dbname, $sqlContent);
@@ -63,7 +66,7 @@ final class Siteinit extends Base
 
 	protected function copySiteFiles($siteExists, $encoding, $dbname, $dbpassword)
 	{
-		$templatePath = $this->getRealBinPath() . '/.template/www';
+		$templatePath = Shell::getRealBinPath() . '/.template/www';
 
 		$srcDirs = [
 			$templatePath,
@@ -134,8 +137,8 @@ final class Siteinit extends Base
 
 		$this->create(Fixdir::class)->run();
 
-		$dbpassword = $this->getRandomPassword();
-		$dbname = $this->getRandomName();
+		$dbpassword = Config::getRandomPassword();
+		$dbname = Config::getRandomName();
 		if ($siteExists)
 		{
 			$encoding = $_SERVER['SITE_ENCODING'] ?? '';
@@ -144,8 +147,6 @@ final class Siteinit extends Base
 		}
 		else
 		{
-			//TODO!!! для local - указать стандартные параметры БД для localwp
-
 			$siteconf = '';
 			$dbconf = '';
 			if ($encoding == 'win')

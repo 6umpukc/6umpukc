@@ -2,8 +2,10 @@
 
 namespace Rodzeta\Siteoptions\Action;
 
+use Rodzeta\Siteoptions\Base;
 use RecursiveIteratorIterator;
 use RecursiveDirectoryIterator;
+
 final class Modpack extends Base
 {
 	public function getName()
@@ -86,14 +88,13 @@ final class Modpack extends Base
 			{
 				continue;
 			}
-			// TODO!!! use mkdir and copy functions
 			system('cp --verbose --parents '
 				. str_replace(DIRECTORY_SEPARATOR, '/', $name) . ' ' . $tmpFolder);
 		}
 		unset($it);
 
 		// convert lang files to windows-1251
-		echo "\nconverting...\n";
+		echo "\nConverting...\n";
 		chdir($tmpFolder);
 		(new Conv(
 			$this->script,
@@ -102,7 +103,7 @@ final class Modpack extends Base
 		))->run();
 
 		chdir('..');
-		echo "\narchiving...\n";
+		echo "\nArchiving...\n";
 		system('tar -zcvf ' . $dest . ' ' . $tmpFolder);
 	}
 }

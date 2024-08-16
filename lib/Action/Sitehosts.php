@@ -2,6 +2,9 @@
 
 namespace Rodzeta\Siteoptions\Action;
 
+use Rodzeta\Siteoptions\Base;
+use Rodzeta\Siteoptions\Shell;
+
 final class Sitehosts extends Base
 {
 	public function getName()
@@ -19,7 +22,18 @@ final class Sitehosts extends Base
 		$localIp = '127.0.0.1';
 		$localIpDup = '::1';
 		$sitehost = $this->getSiteHost();
-		$hosts = explode("\n", file_get_contents('/etc/hosts'));
+		$etcHostsPath = '/etc/hosts';
+		$etcHostsPathWin = '';
+
+		if (Shell::isWSL())
+		{
+			$etcHostsPathWin = Shell::getWinEnvVariable('systemroot') . '\\system32\\drivers\\etc\\hosts';
+			$etcHostsPath = Shell::convertToWinPath($etcHostsPathWin);
+		}
+
+		$hosts = explode("\n", file_get_contents($etcHostsPath));
+
+		echo "Hosts path: " . $etcHostsPath . "\n";
 
 		$newHosts = [];
 		foreach ($hosts as $line)
@@ -39,12 +53,20 @@ final class Sitehosts extends Base
 		echo "$line\n";
 		$newHosts[] = $line;
 
+		echo "\n";
+
+		if (Shell::isWSL())
+		{
+			//TODO!!! как добавлять в системный файл windows автоматизировано
+			echo "NOTE: for WSL add lines to $etcHostsPathWin manually\n\n";
+			return;
+		}
+
 		$tmp = $this->siteRootPath . '/.hosts.tmp';
 		file_put_contents($tmp, implode("\n", $newHosts) . "\n");
-		system("sudo mv $tmp /etc/hosts");
+
+		system("sudo mv $tmp " . $etcHostsPath);
 
 		echo "\n";
-  		echo 'NOTE: for WSL add lines to "%systemroot%\\system32\\drivers\\etc\\hosts" manually' . "\n";
-		//TODO!!!
 	}
 }

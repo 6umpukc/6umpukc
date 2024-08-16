@@ -2,7 +2,10 @@
 
 namespace Rodzeta\Siteoptions\Action;
 
-final class Siteproxy extends Base
+use Rodzeta\Siteoptions\ConfigPatcher;
+use Rodzeta\Siteoptions\Config;
+
+final class Siteproxy extends ConfigPatcher
 {
 	public function getName()
 	{
@@ -14,14 +17,10 @@ final class Siteproxy extends Base
 		return 'bx ' . $this->getName() . ' [host] - Установить IP для прокси-сайта';
 	}
 
-	public function run()
+	protected function processSiteConfig(&$originalContent)
 	{
-		$destpath = $this->getSiteConfig();
 		$ip = $this->params[0] ?? '';
 
-		$originalContent = file_get_contents($destpath);
-
-		// patch content
 		$content = "\n";
 		if ($ip != '')
 		{
@@ -32,42 +31,6 @@ ProxyPassReverse /  http://' . $ip . '/
 ';
 		}
 
-		$re = '{\#bx\-proxy\s+start\s.+?\#bx\-proxy\s+end}s';
-		if (preg_match($re, $originalContent))
-		{
-			// replace
-			$originalContent = preg_replace(
-				$re,
-				"#bx-proxy start$content#bx-proxy end",
-				$originalContent
-			);
-		}
-		else
-		{
-			// add
-			$originalContent = str_replace(
-				'</VirtualHost>',
-				"\n#bx-proxy start$content#bx-proxy end\n\n</VirtualHost>",
-				$originalContent
-			);
-		}
-
-		if (trim($content) == '')
-		{
-			$originalContent = str_replace(
-				"#bx-proxy start$content#bx-proxy end",
-				'',
-				$originalContent
-			);
-		}
-
-		// remove empty lines
-		$originalContent = preg_replace(
-			"{\n{2,}}si",
-			"\n\n",
-			$originalContent
-		);
-
-		$this->patchSiteConfig($destpath, $originalContent);
+		$originalContent = Config::replaceBlock('proxy', $content, $originalContent);
 	}
 }

@@ -43,13 +43,18 @@ function runCommand($script, $siteRootPath, $params)
 	}
 
 	$className = '\\Rodzeta\\Siteoptions\\Action\\' . ucfirst($actionName);
+
 	if (!class_exists($className))
 	{
-		echo "Action [$actionName] not defined\n";
-		return;
+		$className = '\\Rodzeta\\Siteoptions\\Wrapper';
+
+		$action = new $className($script, $siteRootPath, $params, $actionName);
+	}
+	else
+	{
+		$action = new $className($script, $siteRootPath, $params);
 	}
 
-	$action = new $className($script, $siteRootPath, $params);
 	$action->run();
 }
 

@@ -2,6 +2,8 @@
 
 namespace Rodzeta\Siteoptions\Action;
 
+use Rodzeta\Siteoptions\Base;
+
 final class Help extends Base
 {
 	private $commands;

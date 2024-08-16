@@ -2,6 +2,9 @@
 
 namespace Rodzeta\Siteoptions\Action;
 
+use Rodzeta\Siteoptions\Base;
+use Rodzeta\Siteoptions\Shell;
+
 final class Siteremove extends Base
 {
 	public function getName()
@@ -16,6 +19,11 @@ final class Siteremove extends Base
 
 	public function run()
 	{
+		if (!Shell::confirm('Warning! Site config and database will be removed.'))
+		{
+			return;
+		}
+
 		$dbpassword = $_SERVER['DB_PASSWORD'] ?? '';
 		$dbname = $_SERVER['DB_DATABASE'] ?? '';
 		if ($dbname == '')
@@ -33,7 +41,7 @@ final class Siteremove extends Base
 		system('sudo apache2 reload');
 
 		// remove db
-		$dbconf = $this->getRealBinPath() . '/.template/ubuntu/dbdrop.sql';
+		$dbconf = Shell::getRealBinPath() . '/.template/ubuntu/dbdrop.sql';
 		$sqlContent = file_get_contents($dbconf);
 		$sqlContent = str_replace('bitrixdb1', $dbname, $sqlContent);
 		$sqlContent = str_replace('bitrixuser1', $dbname, $sqlContent);

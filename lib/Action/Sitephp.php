@@ -2,7 +2,10 @@
 
 namespace Rodzeta\Siteoptions\Action;
 
-final class Sitephp extends Base
+use Rodzeta\Siteoptions\ConfigPatcher;
+use Rodzeta\Siteoptions\Config;
+
+final class Sitephp extends ConfigPatcher
 {
 	public function getName()
 	{
@@ -14,14 +17,10 @@ final class Sitephp extends Base
 		return 'bx ' . $this->getName() . ' [version] - Сменить версию php для проекта';
 	}
 
-	public function run()
+	protected function processSiteConfig(&$originalContent)
 	{
-		$destpath = $this->getSiteConfig();
 		$version = $this->params[0] ?? '';
 
-		$originalContent = file_get_contents($destpath);
-
-		// patch content
 		$content = "\n";
 		if ($version != '')
 		{
@@ -35,42 +34,6 @@ final class Sitephp extends Base
 ';
 		}
 
-		$re = '{\#bx\-php\s+start\s.+?\#bx\-php\s+end}s';
-		if (preg_match($re, $originalContent))
-		{
-			// replace
-			$originalContent = preg_replace(
-				$re,
-				"#bx-php start$content#bx-php end",
-				$originalContent
-			);
-		}
-		else
-		{
-			// add
-			$originalContent = str_replace(
-				'</VirtualHost>',
-				"\n#bx-php start$content#bx-php end\n\n</VirtualHost>",
-				$originalContent
-			);
-		}
-
-		if (trim($content) == '')
-		{
-			$originalContent = str_replace(
-				"#bx-php start$content#bx-php end",
-				'',
-				$originalContent
-			);
-		}
-
-		// remove empty lines
-		$originalContent = preg_replace(
-			"{\n{2,}}si",
-			"\n\n",
-			$originalContent
-		);
-
-		$this->patchSiteConfig($destpath, $originalContent);
+		$originalContent = Config::replaceBlock('php', $content, $originalContent);
 	}
 }

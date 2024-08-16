@@ -2,8 +2,10 @@
 
 namespace Rodzeta\Siteoptions\Action;
 
-use mysqli;
+use Rodzeta\Siteoptions\Base;
+use Rodzeta\Siteoptions\Shell;
 use DirectoryIterator;
+use mysqli;
 
 final class Sitereset extends Base
 {
@@ -19,7 +21,7 @@ final class Sitereset extends Base
 
 	public function run()
 	{
-		if (!$this->confirm('Warning! Site db tables and files will be removed.'))
+		if (!Shell::confirm('Warning! Site db tables and files will be removed.'))
 		{
 			return;
 		}

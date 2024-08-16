@@ -13,6 +13,8 @@ use CHTMLPagesCache;
 use CEventMessage;
 use CEventType;
 use Bitrix\Main\Application;
+use Rodzeta\Siteoptions\Base;
+use Rodzeta\Siteoptions\Shell;
 
 final class Solutionreset extends Base
 {
@@ -28,7 +30,7 @@ final class Solutionreset extends Base
 
 	public function run()
 	{
-		if (!$this->confirm('Warning! Site public data will be removed.'))
+		if (!Shell::confirm('Warning! Site public data will be removed.'))
 		{
 			return;
 		}

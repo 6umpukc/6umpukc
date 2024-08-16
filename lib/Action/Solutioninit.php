@@ -2,6 +2,9 @@
 
 namespace Rodzeta\Siteoptions\Action;
 
+use Rodzeta\Siteoptions\Base;
+use Rodzeta\Siteoptions\Shell;
+
 final class Solutioninit extends Base
 {
 	public function getName()
@@ -11,33 +14,35 @@ final class Solutioninit extends Base
 
 	public function getDescription()
 	{
-		return 'bx ' . $this->getName() . ' - Клонирует список модулей решения';
+		return 'bx ' . $this->getName() . ' - Клонирует список модулей решения' . "\n"
+			. Shell::getDisplayEnvVariable('SOLUTION_GIT_REPOS', true);
 	}
 
 	public function run()
 	{
-		throw new \Exception('ACTION NOT IMPLEMENTED...');
-		/* TODO!!!
+		$solution = $this->params[0] ?? '';
 
-		var solution = (ARGV.length > 1) ? ARGV[1] : '';
-		var solutionConfigPath = get_home() + '/bin/.dev/solution.env.settings/' + solution + '/example.env';
-		if (solution != '') {
-			if (!File(solutionConfigPath).existsSync()) {
-			die("Config for solution [$solution] not defined.");
-			}
-			var siteConfig = basePath + '/' + BASE_ENV_NAME;
-			var originalContent = file_get_contents(siteConfig);
-			var content = file_get_contents(solutionConfigPath);
-			if (originalContent.indexOf(content) < 0) {
-			content = originalContent + "\n" + content + "\n";
-			file_put_contents(siteConfig, content);
-			}
-			ENV_LOCAL = await load_env(siteConfig);
+		if ($solution == '')
+		{
+			echo "Не указано решение.\n";
+			return;
 		}
-		await fetch_repos(basePath);
 
-		//TODO!!! добавлять в .gitignore в корне сайта список путей для каждого репозитария
+		$solutionConfigPath = Shell::getHome() . '/bin/.solution.settings/' . $solution . '/example.env';
 
-		*/
+		if (!file_exists($solutionConfigPath))
+		{
+			echo "Конфигурация решения $solutionConfigPath не найдена.\n";
+			return;
+		}
+
+		$siteConfig = $this->siteRootPath . '/.env';
+		if (Shell::fixConfig($siteConfig, file_get_contents($solutionConfigPath)))
+		{
+			$newValue = Shell::loadFromEnv($siteConfig, 'SOLUTION_GIT_REPOS');
+			$this->git->setParam('SOLUTION_GIT_REPOS', $newValue);
+		}
+
+		$this->git->fetchRepos();
 	}
 }

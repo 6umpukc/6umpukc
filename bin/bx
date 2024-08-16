@@ -2,8 +2,10 @@
 
 use 5.016;
 use warnings;
+no if $] >= 5.018000, warnings => 'experimental::smartmatch';
+
 use FindBin qw($RealBin $Bin $Script);
-use Cwd qw(cwd getcwd);
+use Cwd qw(cwd getcwd abs_path);
 use File::Basename;
 use File::Copy;
 use File::Path qw(make_path remove_tree);
@@ -46,18 +48,54 @@ sub init_default_env {
 	$ENV{'DIR_LOCAL_SITES'} = $ENV{'HOME'} . '/Local Sites/';
 }
 
+sub is_site_env {
+	my $path = shift;
+	my $configContent = file_get_contents($path . '/.env');
+
+	if ((index($configContent, 'APP_URL=') >= 0)
+			|| (index($configContent, 'SOLUTION_GIT_REPOS=') >= 0)) {
+		return 1;
+	}
+
+	return 0;
+}
+
 sub detect_site_root {
 	my $path = shift;
+	my $checkVars = shift;
+	if (!defined $checkVars) {
+		$checkVars = 1;
+	}
+
 	if ($path eq '') {
-		$path = getcwd();
+		$path = exists $ENV{'PWD'}? $ENV{'PWD'} : getcwd();
 	}
 	if (-f "$path/.env") {
-		return $path;
+		if ($checkVars) {
+			if (is_site_env($path)) {
+				return $path;
+			}
+		} else {
+			return $path;
+		}
 	}
-	if ($path ne '' && ($path ne dirname $path)) {
-		return detect_site_root(dirname $path);
+	if (($path ne '') && ($path ne dirname($path))) {
+		return detect_site_root(dirname($path));
 	}
 	return '';
+}
+
+sub get_env {
+	my $name = shift;
+	my $result = exists $ENV{$name}? $ENV{$name} : '';
+
+	if (substr($result, 0, 1) eq '~') {
+		$result = $ENV{'HOME'} . substr($result, 1);
+	}
+	$result =~ s/\$HOME/$ENV{'HOME'}/g;
+	$result =~ s/\$PATH/$ENV{'PATH'}/g;
+
+	return $result;
 }
 
 sub load_env {
@@ -67,16 +105,36 @@ sub load_env {
 	}
 	my %result = ();
 
+	my $isMultiline = 0;
 	my @lines = split("\n", file_get_contents($path));
+	my $key = '';
+	my $value = '';
 	for my $line (@lines)
 	{
-		my @row = split('=', trim($line));
-		if ((scalar @row) == 0)
-		{
+		if ($isMultiline) {
+			$value .= "\n" . $line;
+
+			my $testLine = unquote($line);
+			if ((index($testLine, "'") >= 0) || (index($testLine, '"') >= 0)) {
+				$isMultiline = 0;
+				$value = trim(unquote(trim($value)));
+				$result{$key} = $value;
+				$ENV{$key} = $value;
+				$key = '';
+				$value = '';
+			}
+
 			next;
 		}
 
-		my $key = $row[0];
+		$line = trim($line);
+		my $p = index($line, '=');
+		if ($p < 0) {
+			next;
+		}
+
+		my @row = (substr($line, 0, $p), substr($line, $p + 1));
+		$key = $row[0];
 		if ($key eq '') {
 			next;
 		}
@@ -84,41 +142,23 @@ sub load_env {
 			next;
 		}
 
-		my $value = unquote($row[1]);
+		$value = unquote($row[1]);
+
+		if ((index($value, "'") >= 0) || (index($value, '"') >= 0)) {
+			$isMultiline = 1;
+			next;
+		}
 
 		$result{$key} = $value;
 		$ENV{$key} = $value;
 	}
 
-	#my $csv = Text::CSV->new({
-	#	binary    => 1,
-	#	auto_diag => 1,
-	#	sep_char  => '='
-	#});
-	#open(my $data, '<:encoding(utf8)', $path) or die "Could not open '$path' $!\n";
-	#while (my $fields = $csv->getline($data)) {
-	#	my $key = trim($fields->[0]);
-	#	if ($key eq '') {
-	#		next;
-	#	}
-	#	if (substr($key, 0, 1) eq '#') {
-	#		next;
-	#	}
-	#	my $value = $fields->[1];
-	#	$result{$key} = $value;
-	#	$ENV{$key} = $value;
-	#}
-	#if (not $csv->eof) {
-	#	$csv->error_diag();
-	#}
-	#close $data;
-
 	return %result;
 }
 
-sub is_mingw() {
+sub is_mingw {
     my $msystem = exists $ENV{'MSYSTEM'} ? $ENV{'MSYSTEM'} : '';
-    if (($msystem eq 'MINGW64') or ($msystem eq 'MINGW32') or ($msystem eq 'MSYS')) {
+	if ($msystem ~~ ['MINGW64', 'MINGW32', 'MSYS']) {
         return 1;
     }
     return 0;
@@ -150,6 +190,28 @@ sub file_put_contents {
     return 0;
 }
 
+sub file_get_contents_win {
+	my $filename = shift;
+    my $result = '';
+    if (open(my $fh, '<:encoding(Windows-1251)', $filename)) {
+        while (my $line = <$fh>) {
+            $result .= $line;
+        }
+    }
+    return $result;
+}
+
+sub file_put_contents_win {
+	my $filename = shift;
+    my $content = shift;
+    if (open(my $fh, '>:encoding(Windows-1251)', $filename)) {
+        print $fh $content;
+        close $fh;
+        return 1;
+    }
+    return 0;
+}
+
 sub trim {
     my $s = shift;
     $s =~ s/^\s+|\s+$//g;
@@ -160,7 +222,7 @@ sub unquote {
 	my $s = shift;
 	my $start = substr($s, 0, 1);
 	my $end = substr($s, -1, 1);
-	while ((length($s) > 1) && ($start eq $end))
+	while ((length($s) > 1) && ($start eq $end) && (($start eq '"') || ($start eq "'")))
 	{
 		$s = substr($s, 1, -1);
 		$start = substr($s, 0, 1);
@@ -171,7 +233,7 @@ sub unquote {
 
 sub is_wsl {
 	return ((exists $ENV{'IS_WSL'})
-		or (exists $ENV{'WSL_DISTRO_NAME'}));
+		|| (exists $ENV{'WSL_DISTRO_NAME'}));
 }
 
 sub confirm_continue {
@@ -202,8 +264,7 @@ sub check_command {
 
 sub require_command {
     my $cmd = shift;
-    my $test = 'which ' . $cmd;
-    if (qx{$test} eq '') {
+    if (!check_command($cmd)) {
         die('[' . $cmd . '] command - not found.');
     }
 }
@@ -216,7 +277,7 @@ sub require_file {
     }
 }
 
-sub ziparchive_extract {
+sub zip_archive_extract {
     require_command('unzip');
 
 	my ($src, $dest) = @_;
@@ -226,6 +287,40 @@ sub ziparchive_extract {
 	return $result;
 }
 
+sub tgz_archive_extract {
+	require_command('tar');
+
+	my ($src, $dest, $dirFromArchive) = @_;
+
+	if (is_mingw()) {
+		$src =~ s/\\/\//g;
+		$src =~ s/C\:/\/c/g;
+	}
+
+	my $result = '';
+	my $cmd = "tar -xvzf '$src'";
+	if ($dest ne '') {
+		$cmd .= " -C '" . $dest . "'";
+	}
+	if ($dirFromArchive ne '') {
+		$cmd .= ' ' . $dirFromArchive;
+	}
+
+	$result = qx{$cmd};
+	return $result;
+}
+
+sub any_archive_extract {
+	my $src = shift;
+	my $dest = shift;
+
+	if (substr($src, -4) eq '.zip') {
+		return zip_archive_extract($src, $dest);
+	} elsif (substr($src, -7) eq '.tar.gz') {
+		return tgz_archive_extract($src, $dest);
+	}
+}
+
 sub request_useragent {
     return 'Mozilla/5.0 (X11; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0';
 }
@@ -233,9 +328,16 @@ sub request_useragent {
 sub request_get {
     require_command('curl');
 
-    my ($url, $outfile) = @_;
+    my ($url, $outfile, $silent) = @_;
+	my $silentOption = '';
+	if ((defined $silent) && ($silent eq '1'))
+	{
+		$silentOption = ' -s';
+	}
     my $result = '';
-    my $cmd = "curl -L '$url'"
+    my $cmd = "curl"
+		. $silentOption
+		. " -L '$url'"
         . " -A '" . request_useragent() . "'";
     if ($outfile && ($outfile ne '')) {
         $cmd .= " -o '$outfile'";
@@ -264,9 +366,15 @@ sub run {
 	$cmd = trim($sudo . ' ' . $cmd);
 	if (is_bx_debug()) {
 		say '';
-		say $cmd;
+		say '$ ' . $cmd;
+		say '';
 	}
 	return system($cmd);
+}
+
+sub run_win_cmd {
+	my $cmd = shift;
+	run 'cmd.exe /c ' . $cmd .  ' 2>/dev/null';
 }
 
 sub sudo {
@@ -347,7 +455,7 @@ sub download_binaries {
 	request_get($srcUrl, $outputFile);
 
 	say "Extracting $outputFile ...";
-	ziparchive_extract($outputFile, $destPath);
+	zip_archive_extract($outputFile, $destPath);
 
 	return $outputFile;
 }
@@ -360,6 +468,10 @@ sub require_site_root {
 }
 
 sub ftp_conn_str {
+	if (!exists $ENV{'DEPLOY_SERVER'} || ($ENV{'DEPLOY_SERVER'} eq '')) {
+		return '';
+	}
+
 	return $ENV{'DEPLOY_METHOD'} . '://'
 		. $ENV{'DEPLOY_USER'} . ':' . $ENV{'DEPLOY_PASSWORD'}
 		. '@' . $ENV{'DEPLOY_SERVER'} . $ENV{'DEPLOY_PORT'} . $ENV{'DEPLOY_PATH'};
@@ -634,6 +746,8 @@ sub action_install_lamp {
 }
 
 sub action_install {
+	# on windows HOME: $ENV{'USERPROFILE'}
+
 	my $homeBin = $ENV{'HOME'} . '/bin';
     if (!-d $homeBin) {
         mkdir($homeBin);
@@ -657,6 +771,147 @@ sub action_install {
 	action_install_php();
 }
 
+sub bitrix_minimize {
+	my @removeDirs = (
+		# ненужные компоненты
+		'bitrix/modules/iblock/install/components/bitrix',
+		'bitrix/modules/fileman/install/components/bitrix',
+		# ненужные модули
+		'bitrix/modules/landing', # слишком много файлов в модуле
+		'bitrix/modules/highloadblock',
+		'bitrix/modules/perfmon',
+		'bitrix/modules/bitrixcloud',
+		'bitrix/modules/translate',
+		'bitrix/modules/compression',
+		'bitrix/modules/seo',
+		'bitrix/modules/search',
+		# ненужные демо решения
+		'bitrix/modules/bitrix.sitecorporate',
+		'bitrix/wizards/bitrix/demo',
+	);
+	for my $dir (@removeDirs) {
+		if (-d $dir) {
+			my $cmd = "rm -Rf '$dir'";
+			qx{$cmd};
+		}
+	}
+}
+
+sub bitrix_micromize {
+	my %bitrixExcludeDirs = (
+		'cache' => 1,
+		'managed_cache' => 1,
+		'modules' => 1,
+		'php_interface' => 1,
+	);
+	my %bitrixExcludeFiles = (
+		'.settings.php' => 1,
+	);
+	my $dirName = './bitrix';
+	my $dh;
+	my $res = opendir $dh, $dirName;
+	if (!$res) {
+		die('Could not open ' . $dirName . ' for reading ' . $! . "\n");
+	}
+	my @files = readdir $dh;
+	for my $f (@files) {
+		if ($f eq '.' or $f eq '..') {
+			next;
+		}
+		if (exists $bitrixExcludeDirs{$f} or exists $bitrixExcludeFiles{$f}) {
+			next;
+		}
+		$f = $dirName . '/' . $f;
+		if (-d $f) {
+			my $cmd = "rm -Rf '$f'";
+			qx{$cmd};
+		} elsif (-f $f) {
+			unlink($f);
+		}
+	}
+	closedir $dh;
+
+	my @removeFiles = (
+		'.access.php',
+		#'.htaccess',
+		#'index.php',
+		'install.config',
+		'license.html',
+		'license.php',
+		'readme.html',
+		'readme.php',
+		'web.config',
+		'bitrix/modules/main/classes/mysql/database_mysql.php',
+	);
+	for my $f (@removeFiles) {
+		if (-f $f) {
+			unlink($f);
+		}
+	}
+}
+
+sub action_fetch {
+	my %urlEditions = (
+		'micro' => $ENV{'BITRIX_SRC_MICRO'},
+		'core' => $ENV{'BITRIX_SRC_CORE'},
+		'start' => $ENV{'BITRIX_SRC_START'},
+		'business' => $ENV{'BITRIX_SRC_BUSINESS'},
+		'crm' => $ENV{'BITRIX_SRC_CRM'},
+		'setup' => $ENV{'BITRIX_SRC_SETUP'},
+		'restore' => $ENV{'BITRIX_SRC_RESTORE'},
+		'test' => $ENV{'BITRIX_SRC_TEST'},
+	);
+
+	my $edition = (scalar @ARGV > 1) ? $ARGV[1] : 'start';
+	if (!exists $urlEditions{$edition}) {
+		$edition = 'start';
+	}
+
+	my $outputFile = '.bitrix.tar.gz';
+	my $extractOptions = '';
+	if (-f $outputFile) {
+		unlink($outputFile);
+	}
+	if ($edition eq 'setup') {
+		$outputFile = 'bitrixsetup.php';
+	} elsif ($edition eq 'restore') {
+		$outputFile = 'restore.php';
+	} elsif ($edition eq 'test') {
+		$outputFile = 'bitrix_server_test.php';
+	} elsif ($edition eq 'micro') {
+		$extractOptions = './bitrix/modules';
+	}
+
+ 	my $srcUrl = $urlEditions{$edition};
+	if ($srcUrl eq '')
+	{
+		return;
+	}
+
+	say "Loading $srcUrl...";
+	request_get($srcUrl, $outputFile);
+	if (!-f $outputFile) {
+    	die('Error on loading bitrix edition or script ' . $srcUrl);
+  	}
+
+	if ($edition ~~ ['setup', 'restore', 'test']) {
+		return;
+	}
+
+	say 'Extracting files...';
+  	tgz_archive_extract($outputFile, '', $extractOptions);
+	unlink($outputFile);
+
+	if ($edition eq 'core') {
+		say 'Minimize for core...';
+		bitrix_minimize();
+	} elsif ($edition eq 'micro') {
+		say 'Micromize...';
+		bitrix_minimize();
+		bitrix_micromize();
+	}
+}
+
 sub action_env {
 	my $basePath = shift;
 	require_site_root($basePath);
@@ -664,8 +919,11 @@ sub action_env {
 	our %config;
 	say "Site root:\n\t$basePath\n";
 
-	say "FTP:\n\t" . ftp_conn_str();
-	say '';
+	my $ftp = ftp_conn_str();
+	if ($ftp ne '') {
+		say "FTP:\n\t" . ftp_conn_str();
+		say '';
+	}
 
 	my $connStr = get_ssh_command();
 	if ($connStr ne '') {
@@ -684,8 +942,22 @@ sub action_env {
 	}
 
 	say 'ENV config:';
-	for my $k (keys %config) {
-		say "    $k -> " . $ENV{$k};
+	for my $k (sort (keys %config)) {
+		my $value = $ENV{$k};
+
+		if ($k ~~ [
+				'BX_SITE_CONFIG_DEST',
+				'BX_SITE_CONFIG_SRC',
+				'BX_BACKUP_GIT_REPOS_DEST',
+				'BX_BACKUP_GIT_REPOS',
+				'SOLUTION_GIT_REPOS',
+			]) {
+			$value = '...';
+		} elsif (index($value, "\t") >= 0) {
+			$value = "\n\t" . join("\n\t", split("\t", $value)) . "\n";
+		}
+
+		say "    $k -> " . $value;
 	}
 }
 
@@ -693,6 +965,9 @@ sub path2wsl {
 	my $path = shift;
 
 	my $distroName = exists $ENV{'WSL_DISTRO_NAME'}? $ENV{'WSL_DISTRO_NAME'} : 'Ubuntu';
+
+	$path = abs_path($path); #FIX for symlinks
+
 	my $result = '\\\wsl.localhost\\' . $distroName . $path;
 
 	return $result;
@@ -724,9 +999,7 @@ sub action_ftp {
 	if (is_mingw()) {
 		run 'start ' . get_filezilla_command($conn_str, $basePath);
 	} elsif (is_wsl()) {
-		#TODO!!!
-		die('TODO!!! convert path for wsl');
-		run 'cmd.exe /c start ' . get_filezilla_command($conn_str, $basePath);
+		run_win_cmd 'start ' . get_filezilla_command($conn_str, $basePath);
 	} else {
 		require_command('filezilla');
 		if (`which screen`) {
@@ -748,6 +1021,15 @@ sub action_ssh {
 	run ssh_exec_remote();
 }
 
+sub action_ssh_test {
+	my $basePath = shift;
+	require_site_root($basePath);
+	require_command('ssh');
+
+	run get_ssh_command();
+}
+
+
 sub action_putty {
 	my $basePath = shift;
 	require_site_root($basePath);
@@ -759,7 +1041,7 @@ sub action_putty {
 sub service {
 	my $action = shift;
 	my $name = shift;
-	if (is_wsl()) {
+	if (is_wsl() && is_ubuntu()) {
 		sudo("service $name $action");
 	} else {
 		sudo("systemctl $action $name");
@@ -772,10 +1054,11 @@ sub action_start {
 		service('start', 'mysql');
 
         if (check_command('rinetd')) {
-            sudo('service rinetd restart');
+            service('restart', 'rinetd');
 		}
 	} else {
-		sudo('systemctl start httpd.service mysqld.service');
+		service('start', 'httpd.service');
+		service('start', 'mysqld.service');
 	}
 }
 
@@ -785,20 +1068,113 @@ sub action_stop {
 		service('stop', 'mysql');
 
         if (check_command('rinetd')) {
-			sudo('service rinetd stop');
+			service('stop', 'rinetd');
 		}
 	} else {
-		sudo('systemctl stop httpd.service mysqld.service');
+		service('stop', 'httpd.service');
+		service('stop', 'mysqld.service');
+	}
+}
+
+sub tar_archive_create {
+	require_command('tar');
+
+	my $dest = shift;
+	my $src = shift;
+
+	if (!-d $src) {
+		say "Folder $src - not exists.";
+		return;
+	}
+
+	if (-f $dest) {
+		unlink($dest);
+	}
+
+	say "Create archive $dest ...";
+	chdir $src;
+	run 'tar -cf ' . $dest . ' .';
+}
+
+sub name_from_git {
+	my $repo = shift;
+
+	my @tmp = split(/\//, $repo);
+	my $name = pop @tmp;
+	if ((substr($name, -4)) eq '.git') {
+		$name = substr($name, 0, -4);
+	}
+
+	return $name;
+}
+
+sub action_git_backup {
+	my @repos = split("\n", $ENV{'BX_BACKUP_GIT_REPOS'});
+	my $destPath = get_env('BX_BACKUP_GIT_REPOS_DEST');
+
+	if (! -d $destPath) {
+		mkdir($destPath);
+	}
+
+	my $destPathArchived = $destPath . '/.archived/';
+	if (! -d $destPathArchived) {
+		mkdir($destPathArchived);
+	}
+
+	chdir $destPath;
+	say getcwd();
+
+	for my $repo (@repos) {
+		$repo = trim($repo);
+
+		if ($repo eq '') {
+			say '';
+			next;
+		}
+
+		say 'git clone ' . $repo;
+
+		my $name = name_from_git($repo);
+		my $path = $destPath . '/' . $name;
+
+		if (-d $path) {
+			chdir $path;
+			my $resultGitPull = `git pull`;
+			if (index($resultGitPull, 'Already up to date') >= 0) {
+				next;
+			}
+		} else {
+			chdir $destPath;
+			run "git clone $repo";
+		}
+
+		my $archivePath = $destPathArchived . $name . '.tar';
+		tar_archive_create($archivePath, $path);
+
+		say '';
 	}
 }
 
 # main
 
 our $site_root = detect_site_root('');
+if ($site_root eq '') {
+	$site_root = detect_site_root('', 0);
+}
 
-# load env
+# load params
 init_default_env();
-our %config = load_env($site_root . '/.env');
+
+# env params from bx path
+our %config = load_env($RealBin . '/.env');
+
+# env params from site
+my %configSite = load_env($site_root . '/.env');
+for my $k (keys %configSite) {
+	$config{$k} = $configSite{$k};
+}
+
+# env params from site BX_ENV
 my $envPrefix = '';
 if (exists $ENV{'BX_ENV'}) {
 	$envPrefix = $ENV{'BX_ENV'};
@@ -806,9 +1182,9 @@ if (exists $ENV{'BX_ENV'}) {
 if ($envPrefix ne '') {
 	my $envFname = $site_root . '/.env.' . $envPrefix;
 	require_file($envFname, 'ENV');
-	my %config2 = load_env($envFname);
-	for my $k (keys %config2) {
-		$config{$k} = $config2{$k};
+	my %configBxEnv = load_env($envFname);
+	for my $k (keys %configBxEnv) {
+		$config{$k} = $configBxEnv{$k};
 	}
 }
 
@@ -826,9 +1202,20 @@ my %actions = (
 		'fn' => \&action_install_lamp,
 	},
 
+	'fetch' => {
+		'fn' => \&action_fetch,
+	},
+
 	'env' => {
 		'fn' => \&action_env,
 	},
+
+	#'env-init' => {
+	# TODO!!! как инициализировать переменные только в текущем терминале? - чтобы установить окружение (переменные) для PHP, NODE и т д
+	# bx env-init
+	# npm install ...
+	# php -v
+	#},
 
 	'ftp' => {
 		'fn' => \&action_ftp,
@@ -836,6 +1223,10 @@ my %actions = (
 
 	'ssh' => {
 		'fn' => \&action_ssh,
+	},
+
+	'ssh-test' => {
+		'fn' => \&action_ssh_test,
 	},
 
 	'putty' => {
@@ -848,6 +1239,10 @@ my %actions = (
 
 	'stop' => {
 		'fn' => \&action_stop,
+	},
+
+	'git-backup' => {
+		'fn' => \&action_git_backup,
 	},
 );
 

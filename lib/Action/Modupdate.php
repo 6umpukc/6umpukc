@@ -2,6 +2,8 @@
 
 namespace Rodzeta\Siteoptions\Action;
 
+use Rodzeta\Siteoptions\Base;
+
 final class Modupdate extends Base
 {
 	public function getName()
@@ -16,6 +18,8 @@ final class Modupdate extends Base
 
 	public function run()
 	{
+		//TODO!!! проверять наличие изменений с последней версии - если их нет не менять версию
+
 		//TODO!!! version param
 		$refreshVersion = !empty($_SERVER['argv'][2]) && ($_SERVER['argv'][2] == 'refresh');
 
@@ -49,7 +53,7 @@ final class Modupdate extends Base
 		system('git push origin ' . $strVersion);
 		system('git push');
 
-		//TODO!!! url solution param
+		//TODO!!! url solution from config SOLUTION_GIT_REPOS
 		//if (!empty($_SERVER['argv'][1]))
 		//{
 		//	system('xdg-open "' . $_SERVER['argv'][1] . '"');

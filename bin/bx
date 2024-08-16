@@ -10,8 +10,8 @@ use File::Path qw(make_path remove_tree);
 use File::Find qw(finddepth);
 use Config;
 
-use lib "$RealBin/vendor/lib/perl5";
-use Text::CSV;
+#use lib "$RealBin/vendor/lib/perl5";
+#use Text::CSV;
 
 # common functions
 
@@ -89,6 +89,29 @@ sub load_env {
 		$result{$key} = $value;
 		$ENV{$key} = $value;
 	}
+
+	#my $csv = Text::CSV->new({
+	#	binary    => 1,
+	#	auto_diag => 1,
+	#	sep_char  => '='
+	#});
+	#open(my $data, '<:encoding(utf8)', $path) or die "Could not open '$path' $!\n";
+	#while (my $fields = $csv->getline($data)) {
+	#	my $key = trim($fields->[0]);
+	#	if ($key eq '') {
+	#		next;
+	#	}
+	#	if (substr($key, 0, 1) eq '#') {
+	#		next;
+	#	}
+	#	my $value = $fields->[1];
+	#	$result{$key} = $value;
+	#	$ENV{$key} = $value;
+	#}
+	#if (not $csv->eof) {
+	#	$csv->error_diag();
+	#}
+	#close $data;
 
 	return %result;
 }

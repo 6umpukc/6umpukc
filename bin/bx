@@ -1096,65 +1096,6 @@ sub tar_archive_create {
 	run 'tar -cf ' . $dest . ' .';
 }
 
-sub name_from_git {
-	my $repo = shift;
-
-	my @tmp = split(/\//, $repo);
-	my $name = pop @tmp;
-	if ((substr($name, -4)) eq '.git') {
-		$name = substr($name, 0, -4);
-	}
-
-	return $name;
-}
-
-sub action_git_backup {
-	my @repos = split("\n", $ENV{'BX_BACKUP_GIT_REPOS'});
-	my $destPath = get_env('BX_BACKUP_GIT_REPOS_DEST');
-
-	if (! -d $destPath) {
-		mkdir($destPath);
-	}
-
-	my $destPathArchived = $destPath . '/.archived/';
-	if (! -d $destPathArchived) {
-		mkdir($destPathArchived);
-	}
-
-	chdir $destPath;
-	say getcwd();
-
-	for my $repo (@repos) {
-		$repo = trim($repo);
-
-		if ($repo eq '') {
-			say '';
-			next;
-		}
-
-		say 'git clone ' . $repo;
-
-		my $name = name_from_git($repo);
-		my $path = $destPath . '/' . $name;
-
-		if (-d $path) {
-			chdir $path;
-			my $resultGitPull = `git pull`;
-			if (index($resultGitPull, 'Already up to date') >= 0) {
-				next;
-			}
-		} else {
-			chdir $destPath;
-			run "git clone $repo";
-		}
-
-		my $archivePath = $destPathArchived . $name . '.tar';
-		tar_archive_create($archivePath, $path);
-
-		say '';
-	}
-}
-
 # main
 
 our $site_root = detect_site_root('');
@@ -1239,10 +1180,6 @@ my %actions = (
 
 	'stop' => {
 		'fn' => \&action_stop,
-	},
-
-	'git-backup' => {
-		'fn' => \&action_git_backup,
 	},
 );
 

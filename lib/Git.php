@@ -30,6 +30,11 @@ final class Git
 		return $this->params[$key];
 	}
 
+	public function getName($url)
+	{
+		return basename($url, '.git');
+	}
+
 	public function getMapRepos()
 	{
 		$pathModules = $this->getBitrixModulesPath();
@@ -59,7 +64,7 @@ final class Git
 			$tmp = explode(static::SOLUTION_REPOS_SEP, $line);
 
 			$url = trim($tmp[0]);
-			$moduleId = basename($url, '.git');
+			$moduleId = $this->getName($url);
 			$branch = (count($tmp) > 1)? trim($tmp[1]) : 'master';
 
 			if (!is_dir($pathModules))

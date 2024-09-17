@@ -36,11 +36,11 @@ final class Shell
 		}
 	}
 
-	public static function run($cmd)
+	public static function run($cmd, &$output = null)
 	{
 		static::printCommand($cmd);
 
-		return system($cmd);
+		return exec($cmd);
 	}
 
 	public static function fixConfig($destPath, $patchContent)
@@ -246,5 +246,28 @@ final class Shell
 		}
 
 		return true;
+	}
+
+	public static function tarCreate($dest, $src)
+	{
+		if (!static::checkCommand('tar'))
+		{
+			return;
+		}
+
+		if (!is_dir($src))
+		{
+			echo "Folder $src - not exists.\n";
+			return;
+		}
+
+		if (file_exists($dest))
+		{
+			unlink($dest);
+		}
+
+		echo "Create archive $dest ...\n";
+		chdir($src);
+		static::run('tar -cf ' . $dest . ' .');
 	}
 }

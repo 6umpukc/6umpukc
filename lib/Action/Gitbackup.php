@@ -18,4 +18,59 @@ final class Gitbackup extends Base
 			. Shell::getDisplayEnvVariable('BX_BACKUP_GIT_REPOS_DEST')
 			. Shell::getDisplayEnvVariable('BX_BACKUP_GIT_REPOS');
 	}
+
+	public function run()
+	{
+		$repos = Shell::getValues($_SERVER['BX_BACKUP_GIT_REPOS'] ?? '');
+		$destPath = Shell::getReplacedEnvVariables($_SERVER['BX_BACKUP_GIT_REPOS_DEST'] ?? '');
+
+		if (empty($destPath))
+		{
+			return;
+		}
+
+		if (!is_dir($destPath))
+		{
+			mkdir($destPath);
+		}
+
+		$destPathArchived = $destPath . '/.archived/';
+		if (!is_dir($destPathArchived))
+		{
+			mkdir($destPathArchived);
+		}
+
+		chdir($destPath);
+		echo getcwd() . "\n";
+
+		foreach ($repos as $repo)
+		{
+			echo "Clone $repo ...\n";
+
+			$name = $this->git->getName($repo);
+			$path = $destPath . '/' . $name;
+
+			chdir($destPath);
+
+			if (is_dir($path))
+			{
+				chdir($path);
+				Shell::run('git pull', $resultGitPull);
+				if (mb_strpos($resultGitPull, 'Already up to date') !== false)
+				{
+					continue;
+				}
+			}
+			else
+			{
+				chdir($destPath);
+				Shell::run('git clone ' . $repo);
+			}
+
+			$archivePath = $destPathArchived . $name . '.tar';
+			Shell::tarCreate($archivePath, $path);
+
+			echo "\n";
+		}
+	}
 }

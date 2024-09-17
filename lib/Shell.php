@@ -40,7 +40,10 @@ final class Shell
 	{
 		static::printCommand($cmd);
 
-		return exec($cmd);
+		$res = exec($cmd, $tmp);
+		$output = implode("\n", $tmp);
+
+		return $res;
 	}
 
 	public static function fixConfig($destPath, $patchContent)
@@ -139,6 +142,29 @@ final class Shell
 			|| isset($_SERVER['WSL_DISTRO_NAME']);
 	}
 
+	public static function isUbuntu()
+	{
+		static $result = null;
+		if ($result !== null)
+		{
+			return $result;
+		}
+
+		if (!static::checkCommand('lsb_release'))
+		{
+			$result = false;
+		}
+		else
+		{
+			static::run('lsb_release -a' . ' 2>/dev/null', $os);
+
+			$result = (mb_stripos($os, 'debian') !== false)
+				|| (mb_stripos($os, 'ubuntu') !== false);
+		}
+
+		return $result;
+	}
+
 	public static function getReplacedEnvVariables($path)
 	{
 		$result = $path;
@@ -229,7 +255,10 @@ final class Shell
 	public static function checkCommand($cmd)
 	{
 		$test = 'which ' . $cmd;
+
+		ob_start();
 		$path = trim(system($test));
+		ob_end_clean();
 
 		// skip windows executable from WSL
 		if (mb_strpos($path, '/mnt/c/') !== false)
@@ -269,5 +298,31 @@ final class Shell
 		echo "Create archive $dest ...\n";
 		chdir($src);
 		static::run('tar -cf ' . $dest . ' .');
+	}
+
+	public static function sudo($cmd, $sudo = '')
+	{
+		if (static::isUbuntu())
+		{
+			$sudo = 'sudo ';
+		}
+		if (($_SERVER['BX_ROOT_USER'] ?? '') == '1')
+		{
+			$sudo = '';
+		}
+
+		return static::run($sudo . $cmd);
+	}
+
+	public static function service($action, $name)
+	{
+		if (static::isWSL() && static::isUbuntu())
+		{
+			static::sudo("service $name $action");
+		}
+		else
+		{
+			static::sudo("systemctl $action $name");
+		}
 	}
 }

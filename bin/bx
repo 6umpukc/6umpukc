@@ -1048,34 +1048,6 @@ sub service {
 	}
 }
 
-sub action_start {
-	if (is_ubuntu()) {
-		service('start', 'apache2');
-		service('start', 'mysql');
-
-        if (check_command('rinetd')) {
-            service('restart', 'rinetd');
-		}
-	} else {
-		service('start', 'httpd.service');
-		service('start', 'mysqld.service');
-	}
-}
-
-sub action_stop {
-	if (is_ubuntu()) {
-		service('stop', 'apache2');
-		service('stop', 'mysql');
-
-        if (check_command('rinetd')) {
-			service('stop', 'rinetd');
-		}
-	} else {
-		service('stop', 'httpd.service');
-		service('stop', 'mysqld.service');
-	}
-}
-
 sub tar_archive_create {
 	require_command('tar');
 
@@ -1172,14 +1144,6 @@ my %actions = (
 
 	'putty' => {
 		'fn' => \&action_putty,
-	},
-
-	'start' => {
-		'fn' => \&action_start,
-	},
-
-	'stop' => {
-		'fn' => \&action_stop,
 	},
 );
 

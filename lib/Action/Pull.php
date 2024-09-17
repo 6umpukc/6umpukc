@@ -7,11 +7,6 @@ use Rodzeta\Siteoptions\Shell;
 
 final class Pull extends Base
 {
-	public function getName()
-	{
-		return 'pull';
-	}
-
 	public function getDescription()
 	{
 		return 'bx ' . $this->getName() . ' - Стянуть изменения по git-репозитариям решения' . "\n"

@@ -36,9 +36,19 @@ final class Shell
 		}
 	}
 
-	public static function run($cmd, &$output = null)
+	public static function run($cmd)
 	{
 		static::printCommand($cmd);
+
+		return system($cmd);
+	}
+
+	public static function runGetContent($cmd, &$output = null, $disableDebug = null)
+	{
+		if ($disableDebug !== true)
+		{
+			static::printCommand($cmd);
+		}
 
 		$res = exec($cmd, $tmp);
 		$output = implode("\n", $tmp);
@@ -109,6 +119,26 @@ final class Shell
 		return exec($cmd, $output);
 	}
 
+	public static function runCScript($arguments = [])
+	{
+		if (empty($arguments))
+		{
+			return;
+		}
+
+		$args = '"' . implode('" "', $arguments) . '"';
+		$cmd = 'cscript.exe ' . $args;
+		$cmd = str_replace('&', '^&', $cmd);
+
+		static::printCommand($cmd);
+
+		ob_start();
+		$result = static::run($cmd . ' 2>/dev/null');
+		ob_end_clean();
+
+		return $result;
+	}
+
 	public static function getWinEnvVariable($name)
 	{
 		$result = '';
@@ -156,7 +186,7 @@ final class Shell
 		}
 		else
 		{
-			static::run('lsb_release -a' . ' 2>/dev/null', $os);
+			static::runGetContent('lsb_release -a' . ' 2>/dev/null', $os, true);
 
 			$result = (mb_stripos($os, 'debian') !== false)
 				|| (mb_stripos($os, 'ubuntu') !== false);

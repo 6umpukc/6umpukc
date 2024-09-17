@@ -7,11 +7,6 @@ use Rodzeta\Siteoptions\Shell;
 
 final class Fetch extends Base
 {
-	public function getName()
-	{
-		return 'fetch';
-	}
-
 	protected function getVariants()
 	{
 		$result = [];

@@ -7,11 +7,6 @@ use Rodzeta\Siteoptions\Shell;
 
 final class Status extends Base
 {
-	public function getName()
-	{
-		return 'status';
-	}
-
 	public function getDescription()
 	{
 		return 'bx ' . $this->getName() . ' - Проверить состояние по git-репозитариям решения' . "\n"

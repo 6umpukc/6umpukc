@@ -7,31 +7,26 @@ use Rodzeta\Siteoptions\Encoding;
 
 final class Conv extends Base
 {
-	public function getName()
-	{
-		return 'conv';
-	}
-
 	public function getDescription()
 	{
 		return 'bx ' . $this->getName() . ' win|utf . - Конвертирует кодировку в текущей директории' . "\n"
 			. 'bx ' . $this->getName() . ' win|utf - Конвертирует кодировку модулей решения';
 	}
 
-	protected function processDir($basePath, $encoding)
+	protected function processDir($basePath, $encoding, $onlyExtensions = null)
 	{
 		if ($encoding == 'win')
 		{
-			echo "Converting to windows-1251 ...\n";
+			echo "Converting to windows-1251 $basePath ...\n";
 		}
 		else
 		{
-			echo "Converting to UTF-8 ...\n";
+			echo "Converting to UTF-8 $basePath ...\n";
 		}
 
 		foreach (Encoding::getList($basePath, [
 				'/xml/ru/',
-			]) as $f)
+			], $onlyExtensions) as $f)
 		{
 			$name = $f->getPathname();
 			$content = file_get_contents($name);
@@ -62,17 +57,22 @@ final class Conv extends Base
 		$encoding = $this->params[0] ?? 'win';
 		$onlyCurrentDir = !empty($this->params[1]) && ($this->params[1] == '.');
 
+		$onlyExtensions = array_map('trim', array_filter(explode(',', $this->params[2] ?? '')));
+		if (count($onlyExtensions) == 0) {
+			$onlyExtensions = null;
+		}
+
 		if ($onlyCurrentDir)
 		{
 			$basePath = getcwd();
-			$this->processDir($basePath, $encoding);
+			$this->processDir($basePath, $encoding, $onlyExtensions);
 
 			return;
 		}
 
 		foreach ($this->git->iterateRepos() as $repoInfo)
 		{
-			$this->processDir($repoInfo['path'], $encoding);
+			$this->processDir($repoInfo['path'], $encoding, $onlyExtensions);
 		}
 	}
 }

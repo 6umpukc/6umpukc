@@ -9,8 +9,9 @@ use Cwd qw(cwd getcwd abs_path);
 use File::Basename;
 use File::Copy;
 use File::Path qw(make_path remove_tree);
-use File::Find qw(finddepth);
+use File::Find qw(finddepth find);
 use Config;
+use Data::Dumper;
 
 #use lib "$RealBin/vendor/lib/perl5";
 #use Text::CSV;
@@ -23,10 +24,15 @@ sub init_default_env {
 	$ENV{'PHP_URLS_MACOS'} = '';
 	$ENV{'PHP_URLS_LINUX'} = '';
 
-	$ENV{'NODE_URLS_WIN32'} = 'https://nodejs.org/dist/v20.16.0/node-v20.16.0-win-x86.zip';
-	$ENV{'NODE_URLS_WIN64'} = 'https://nodejs.org/dist/v20.16.0/node-v20.16.0-win-x64.zip';
-	$ENV{'NODE_URLS_MACOS'} = 'https://nodejs.org/dist/v20.16.0/node-v20.16.0-darwin-x64.tar.gz';
-	$ENV{'NODE_URLS_LINUX'} = 'https://nodejs.org/dist/v20.16.0/node-v20.16.0-linux-x64.tar.gz';
+	$ENV{'NODE_URLS_WIN32'} = 'https://nodejs.org/dist/v20.17.0/node-v20.17.0-win-x86.zip';
+	$ENV{'NODE_URLS_WIN64'} = 'https://nodejs.org/dist/v20.17.0/node-v20.17.0-win-x64.zip';
+	$ENV{'NODE_URLS_MACOS'} = 'https://nodejs.org/dist/v20.17.0/node-v20.17.0-darwin-x64.tar.gz';
+	$ENV{'NODE_URLS_LINUX'} = 'https://nodejs.org/dist/v20.17.0/node-v20.17.0-linux-x64.tar.gz';
+
+	$ENV{'NODE14_URLS_WIN32'} = 'https://nodejs.org/dist/v14.21.3/node-v14.21.3-win-x86.zip';
+	$ENV{'NODE14_URLS_WIN64'} = 'https://nodejs.org/dist/v14.21.3/node-v14.21.3-win-x64.zip';
+	$ENV{'NODE14_URLS_MACOS'} = 'https://nodejs.org/dist/v14.21.3/node-v14.21.3-darwin-x64.tar.gz';
+	$ENV{'NODE14_URLS_LINUX'} = 'https://nodejs.org/dist/v14.21.3/node-v14.21.3-linux-x64.tar.gz';
 
 	$ENV{'BITRIX_SRC_MICRO'} = 'https://www.1c-bitrix.ru/download/start_encode_php5.tar.gz';
 	$ENV{'BITRIX_SRC_CORE'} = 'https://www.1c-bitrix.ru/download/start_encode_php5.tar.gz';
@@ -100,6 +106,8 @@ sub get_env {
 
 sub load_env {
 	my $path = shift;
+	my $disableSetEnv = shift;
+
 	if (!-f $path) {
 		return;
 	}
@@ -119,7 +127,9 @@ sub load_env {
 				$isMultiline = 0;
 				$value = trim(unquote(trim($value)));
 				$result{$key} = $value;
-				$ENV{$key} = $value;
+				if (!defined $disableSetEnv) {
+					$ENV{$key} = $value;
+				}
 				$key = '';
 				$value = '';
 			}
@@ -150,7 +160,9 @@ sub load_env {
 		}
 
 		$result{$key} = $value;
-		$ENV{$key} = $value;
+		if (!defined $disableSetEnv) {
+			$ENV{$key} = $value;
+		}
 	}
 
 	return %result;
@@ -302,7 +314,7 @@ sub tgz_archive_extract {
 	if ($dest ne '') {
 		$cmd .= " -C '" . $dest . "'";
 	}
-	if ($dirFromArchive ne '') {
+	if (defined $dirFromArchive && ($dirFromArchive ne '')) {
 		$cmd .= ' ' . $dirFromArchive;
 	}
 
@@ -360,15 +372,22 @@ sub is_ubuntu {
 sub run {
 	my $cmd = shift;
 	my $sudo = shift;
-	if (!defined($sudo) || $sudo ne 'sudo') {
+	my $disableDebug = shift;
+
+	if (!defined($sudo) || ($sudo ne 'sudo')) {
 		$sudo = '';
 	}
+
 	$cmd = trim($sudo . ' ' . $cmd);
-	if (is_bx_debug()) {
-		say '';
-		say '$ ' . $cmd;
-		say '';
+
+	if (!defined($disableDebug) || ($disableDebug == 0)) {
+		if (is_bx_debug()) {
+			say '';
+			say '$ ' . $cmd;
+			say '';
+		}
 	}
+
 	return system($cmd);
 }
 
@@ -407,6 +426,7 @@ sub patch_file {
 sub sudo_patch_file {
 	my $fname = shift;
 	my $content = shift;
+
 	if (! -f $fname) {
 		return;
 	}
@@ -420,13 +440,40 @@ sub sudo_patch_file {
 	}
 }
 
+sub replace_var_file {
+	my $fname = shift;
+	my $name = shift;
+	my $value = shift;
+
+	if (! -f $fname) {
+		return;
+	}
+
+	my $content = file_get_contents($fname);
+	if ($content =~ /$name\=".+?"/) {
+		$content =~ s/$name\=".+?"/$name="$value"/;
+		file_put_contents($fname, $content);
+	}
+}
+
 sub download_binaries {
 	my $urlPrefix = shift;
 	my $downloadPath = shift;
 	my $destPath = shift;
 
+	if ($downloadPath eq '') {
+		$downloadPath = $ENV{'HOME'} . '/.cachebin';
+		if (! -d $downloadPath) {
+			mkdir($downloadPath);
+		}
+	}
+
 	if (!$destPath) {
 		$destPath = $downloadPath;
+	}
+
+	if (! -d $destPath) {
+		mkdir($destPath);
 	}
 
 	my $srcUrl = '';
@@ -451,11 +498,14 @@ sub download_binaries {
 	}
 
 	my $outputFile = $downloadPath . '/' . basename($srcUrl);
-	say "Loading $srcUrl ...";
-	request_get($srcUrl, $outputFile);
 
-	say "Extracting $outputFile ...";
-	zip_archive_extract($outputFile, $destPath);
+	if (! -f $outputFile) {
+		say "Loading $srcUrl ...";
+		request_get($srcUrl, $outputFile);
+	}
+
+	say "Extracting $outputFile to $destPath ...";
+	any_archive_extract($outputFile, $destPath);
 
 	return $outputFile;
 }
@@ -581,196 +631,6 @@ sub require_site_config {
 	);
 }
 
-sub install_php {
-	my $version = shift || '';
-	sudo('apt install'
-		. " php$version"
-		. " php$version-fpm"
-		. " php$version-mysql"
-		. " php$version-mbstring"
-		. " php$version-opcache"
-		. " php$version-zip"
-		. " php$version-xml"
-		. " php$version-curl"
-		. " php$version-gd"
-		. " php$version-sqlite3"
-		. " php$version-imagick"
-		. " php$version-xdebug"
-	);
-
-	# patch configs
-	my $phpContent = file_get_contents(dirname($RealBin) . '/.template/bitrix.php.ini');
-	my @phpDirs = glob('/etc/php/*');
-	my @tmp = map { basename($_) } sort { $b cmp $a } @phpDirs;
-
-	for my $phpVersion (@tmp) {
-		if (($version eq '') || ($version eq $phpVersion))
-		{
-			say "Patch $phpVersion for Bitrix...";
-			sudo_patch_file('/etc/php/' . $phpVersion . '/apache2/php.ini', $phpContent);
-			sudo_patch_file('/etc/php/' . $phpVersion . '/fpm/php.ini', $phpContent);
-			sudo_patch_file('/etc/php/' . $phpVersion . '/cli/php.ini', $phpContent);
-		}
-	}
-}
-
-# actions
-
-sub action_install_php {
-	#if (check_command('php')) {
-	#	return;
-    #}
-	if (is_mingw()) {
-		my $homeBin = $ENV{'HOME'} . '/bin';
-		my $destPath = $homeBin . '/php';
-		my $outputFile = download_binaries('PHP_URLS', $homeBin, $destPath);
-		if (-f $outputFile) {
-			unlink($outputFile);
-		}
-		patch_file($ENV{'HOME'} . '/.profile', 'PATH=$HOME/bin/php:$PATH');
-		#$ENV{'PATH'} = $ENV{'HOME'} . '/bin/php:' . $ENV{'PATH'};
-	} elsif (is_ubuntu()) {
-		my $phpVersion = defined $ARGV[1]? $ARGV[1] : '';
-		install_php($phpVersion);
-	}
-	#TODO!!! add to windows PATH
-}
-
-sub action_install_mkcert {
-	#TODO!!! fix
-    if (is_ubuntu()) {
-		my $certKeyName = (exists $ENV{'BX_MKCERT'} && ($ENV{'BX_MKCERT'} ne ''))?
-			$ENV{'BX_MKCERT'} : 'bx.local *.bx.local';
-		$certKeyName = join(' ', map { '"' . $_ . '"' } split(/\s+/, $certKeyName));
-
-		sudo('apt install libnss3-tools');
-    	sudo('snap install go --classic');
-    	run('rm -Rf ~/bin/mkcert-src/');
-    	run('git clone https://github.com/FiloSottile/mkcert ~/bin/mkcert-src');
-    	run('cd ~/bin/mkcert-src/ && go build -ldflags "-X main.Version=$(git describe --tags)" && mv mkcert ~/bin/mkcert');
-    	run('mkcert -install');
-    	run('mkdir ~/.ssl/ && cd ~/.ssl/ && mkcert ' . $certKeyName);
-    	sudo('a2enmod ssl');
-    }
-}
-
-sub action_install_lamp {
-	if (is_ubuntu()) {
-		say '';
-		say '# Install php, apache2, mysql and tools...';
-
-        sudo('apt install software-properties-common -y');
-		sudo('add-apt-repository ppa:ondrej/php');
-
-		sudo('apt-get update -y');
-
-		sudo('apt install unzip wget curl dos2unix pwgen sshpass screen');
-		sudo('apt install'
-			. ' apache2 libapache2-mod-fcgid'
-            . ' mysql-server mysql-client'
-            . ' php libapache2-mod-php'
-        );
-
-		install_php();
-
-		# sudo adduser bitrix www-data
-		sudo('usermod -a -G www-data ' . $ENV{'USER'});
-		sudo('chmod 755 ~/');
-		run('chmod +x /home/' . $ENV{'USER'});
-		my $homePath = $ENV{'HOME'};
-		my $extWww = $homePath . '/ext_www';
-		if (! -d $extWww) {
-			mkdir $extWww;
-		}
-
-		#TODO!!! patch  /etc/apache2/apache2.conf -> <Directory /> -> AllowOverride All
-		say 'Add to /etc/apache2/apache2.conf -> <Directory />';
-		say '	AllowOverride All';
-		say '	Require all granted';
-		say '';
-
-        sudo('apt install msmtp');
-        sudo('apt install optipng jpegoptim pngquant');
-        #sudo('apt install rinetd');
-
-		sudo('a2enmod php');
-
-		sudo('a2enmod actions');
-		sudo('a2enmod fcgid');
-		sudo('a2enmod alias');
-		sudo('a2enmod proxy_fcgi');
-
-		sudo('a2enmod rewrite');
-		sudo('a2enmod proxy');
-		sudo('a2enmod proxy_http');
-
-		#sudo('snap install node --classic');
-
-		#TODO!!! версии ниже ?7.2 не работают с mysql8 из коробки
-        #sudo('apachectl configtest')
-        # global switch php (для основной версии mod_php)
-        #sudo('a2dismod php7.4')
-        #sudo('a2enmod php')
-
-		say '';
-		say '# Mysql config setup...';
-		sudo('mysql_secure_installation');
-		say '';
-		say '# Mysql config check...';
-		sudo('mysqladmin -p -u root version');
-
-		my $mysqlContent = file_get_contents(dirname($RealBin) . '/.template/ubuntu/bitrix.my.cnf');
-		sudo_patch_file('/etc/mysql/my.cnf', $mysqlContent);
-
-		say '';
-		say '# Mail sender setup...';
-		copy(dirname($RealBin) . '/.template/.msmtprc', $homePath . '/.msmtprc');
-		sudo('chown www-data:www-data ' . $homePath . '/.msmtprc');
-		sudo('chmod 0600 ' . $homePath . '/.msmtprc');
-		if (-f '/etc/msmtprc') {
-			sudo('unlink /etc/msmtprc');
-		}
-		sudo('ln -s ' . $homePath . '/.msmtprc /etc/msmtprc');
-
-		say '';
-		say '# Setup locale for windows-1251...';
-		sudo('locale-gen ru_RU.CP1251');
-		sudo('dpkg-reconfigure locales');
-
-		# check locale:
-		#	`locale -a | grep ru`
-		#	`less /usr/share/i18n/SUPPORTED | grep ru_RU | grep CP1251`
-		# for centos:
-		#	`localedef -c -i ru_RU -f CP1251 ru_RU.CP1251`
-	}
-}
-
-sub action_install {
-	# on windows HOME: $ENV{'USERPROFILE'}
-
-	my $homeBin = $ENV{'HOME'} . '/bin';
-    if (!-d $homeBin) {
-        mkdir($homeBin);
-    }
-
-	my $fnameEnv = dirname($RealBin) . '/.env';
-	if (!(-f $fnameEnv)) {
-		copy(dirname($RealBin) . '/.env.example', $fnameEnv);
-	}
-
-	if (is_mingw()) {
-		patch_file($ENV{'HOME'} . '/.profile', 'export MSYS=winsymlinks:native');
-    }
-
-	my $homeScript = $homeBin . '/' . $Script;
-	if (-l $homeScript) {
-		unlink($homeScript);
-	}
-	symlink($RealBin . '/' . $Script, $homeScript);
-
-	action_install_php();
-}
-
 sub bitrix_minimize {
 	my @removeDirs = (
 		# ненужные компоненты
@@ -848,6 +708,804 @@ sub bitrix_micromize {
 			unlink($f);
 		}
 	}
+}
+
+sub install_php {
+	my $version = shift || '';
+	sudo('apt install'
+		. " php$version"
+		. " php$version-fpm"
+		. " php$version-mysql"
+		. " php$version-mbstring"
+		. " php$version-opcache"
+		. " php$version-zip"
+		. " php$version-xml"
+		. " php$version-curl"
+		. " php$version-gd"
+		. " php$version-sqlite3"
+		. " php$version-imagick"
+		. " php$version-xdebug"
+	);
+
+	# patch configs
+	my $phpContent = file_get_contents(dirname($RealBin) . '/.template/bitrix.php.ini');
+	my @phpDirs = glob('/etc/php/*');
+	my @tmp = map { basename($_) } sort { $b cmp $a } @phpDirs;
+
+	for my $phpVersion (@tmp) {
+		if (($version eq '') || ($version eq $phpVersion))
+		{
+			say "Patch $phpVersion for Bitrix...";
+			sudo_patch_file('/etc/php/' . $phpVersion . '/apache2/php.ini', $phpContent);
+			sudo_patch_file('/etc/php/' . $phpVersion . '/fpm/php.ini', $phpContent);
+			sudo_patch_file('/etc/php/' . $phpVersion . '/cli/php.ini', $phpContent);
+		}
+	}
+}
+
+sub path2wsl {
+	my $path = shift;
+
+	my $distroName = exists $ENV{'WSL_DISTRO_NAME'}? $ENV{'WSL_DISTRO_NAME'} : 'Ubuntu';
+
+	$path = abs_path($path); #FIX for symlinks
+
+	my $result = '\\\wsl.localhost\\' . $distroName . $path;
+
+	return $result;
+}
+
+sub get_filezilla_command {
+	my $conn_str = shift;
+	my $basePath = shift;
+	my $exePath = shift;
+
+	if (!$exePath || ($exePath eq '')) {
+		$exePath = 'filezilla';
+	}
+
+	if (is_wsl())
+	{
+		$basePath = path2wsl($basePath);
+	}
+
+	return $exePath . " '" . $conn_str . "' --local='" . $basePath . "'";
+}
+
+sub remove_base_path {
+	my $result = shift;
+	our $site_root;
+
+	$result =~ s/$site_root//;
+
+	return $result;
+}
+
+sub process_dir_links {
+	my $path = shift;
+	my $dest = shift;
+	my $moduleName = shift;
+	my $createSubdirs = shift || 0;
+	my $commonFiles = shift;
+
+	my %result = ();
+
+	if (! -d $path) {
+		return %result;
+	}
+
+	if (! -d $dest) {
+		make_path($dest);
+	}
+
+	say remove_base_path($path) . " -> " . remove_base_path($dest);
+
+	opendir(my $dh, $path);
+	my @files = readdir($dh);
+	closedir($dh);
+
+	for my $f (@files) {
+		if (($f eq '.') or ($f eq '..')) {
+			next;
+		}
+
+		my $srcPath = $path . '/' . $f;
+		my $destPath = $dest . '/' . $f;
+
+		if ($commonFiles->{$destPath}) {
+			process_dir_links(
+				$srcPath,
+				$destPath,
+				$moduleName
+			);
+			next;
+		}
+
+		my $tmpPath = '/' . basename(dirname($srcPath)). '/' . basename($srcPath);
+		my $isSpecialPath = 0;
+		#TODO!!! list or check dirs in common template and common_template
+		if ($tmpPath eq '/components/bitrix') {
+			$isSpecialPath = 1;
+		}
+		if ($isSpecialPath) {
+			process_dir_links(
+				$srcPath,
+				$destPath,
+				$moduleName
+			);
+			next;
+		}
+
+		if ((-l $destPath) or (-f $destPath)) {
+			if (!$isSpecialPath) {
+				unlink($destPath);
+			}
+		} elsif (-d $destPath) {
+			remove_tree($destPath);
+		}
+
+		if (-d $srcPath) {
+			if ($createSubdirs) {
+				make_path($destPath);
+				$result{$destPath} = 1;
+				process_dir_links(
+					$srcPath,
+					$destPath,
+					$moduleName
+				);
+			} else {
+				say "\tlink: " . $f;
+				symlink($srcPath, $destPath);
+				#TODO!!! - for windows: mklink /D "path to newlink" "path to module folder"
+			}
+		} else {
+			say "\tlink: " . $f;
+			symlink($srcPath, $destPath);
+			#TODO!!! - for windows: mklink "path to newlink" "path to module folder"
+		}
+	}
+
+	say '';
+
+	return %result;
+}
+
+sub find_dir_by_path {
+	my $basePath = shift;
+	my $path = shift;
+	my $result = '';
+
+	if (! -d $basePath) {
+		return $result;
+	}
+
+	find (sub {
+		if ($result ne '') {
+			return;
+		}
+
+		if (index($File::Find::name, $path) >= 0) {
+			$result = $File::Find::dir;
+		}
+    }, $basePath);
+
+	return $result;
+}
+
+sub is_module_using_extensions {
+	my $path = shift;
+	$path .= '/.env';
+
+	if (! -f $path) {
+		return 0;
+	}
+
+	my %moduleEnv = load_env($path, 1);
+
+	return exists $moduleEnv{'USING_EXTENSIONS'} && ($moduleEnv{'USING_EXTENSIONS'} eq '1');
+}
+
+sub process_module_links {
+	my $basePath = shift;
+	my $modulePath = shift;
+	my $moduleName = shift;
+
+	say 'Process module ' . $moduleName . ' ...';
+	say '';
+
+	my ($partnerName, $moduleId) = split(/\./, $moduleName);
+	my $jsRel = $partnerName . '/' .  $moduleId;
+	my $jsFrom;
+	my $jsPath;
+	if (is_module_using_extensions($modulePath, 'USING_EXTENSIONS')) {
+		$jsFrom = 'install/js/' . $jsRel;
+		$jsPath = '/bitrix/js/' . $jsRel;
+	} else {
+		$jsFrom = 'install/js';
+		$jsPath = '/bitrix/js/' . $moduleName;
+	}
+
+	my %resourceDirs = (
+		'install/components/' . $partnerName => '/bitrix/components/' . $partnerName,
+		'install/components/' . $moduleName => '/bitrix/components/' . $moduleName,
+		'install/wizards/' . $partnerName => '/bitrix/wizards/' . $partnerName,
+		'install/admin' => '/bitrix/admin',
+		'install/tools' => '/bitrix/tools',
+		'install/gadgets' => '/bitrix/gadgets',
+		'install/templates' => '/bitrix/templates',
+		'install/services' => '/bitrix/services',
+		$jsFrom => $jsPath,
+		'install/css' => '/bitrix/css',
+		'install/themes/.default/' => '/bitrix/themes/.default',
+	);
+
+	for my $src (keys(%resourceDirs)) {
+		process_dir_links(
+			$modulePath . '/' . $src,
+			$basePath . $resourceDirs{$src},
+			$moduleName
+		);
+	}
+
+	# process templates #TODO!!! - вынести частный список в настройку SOLUTION_LINK_DIRS
+	my $templatesPath = find_dir_by_path($modulePath . '/install/wizards/' . $partnerName, '/site/templates/');
+	if ($templatesPath ne '') {
+		my $templatesCommonPath = dirname($templatesPath) . '/templates_common';
+
+		opendir(my $dh, $templatesPath);
+		my @files = readdir($dh);
+		closedir($dh);
+		for my $f (@files) {
+			if (($f eq '.') or ($f eq '..')) {
+				next;
+			}
+
+			my %commonFiles = ();
+			if (-d $templatesCommonPath) {
+				%commonFiles = process_dir_links(
+					$templatesCommonPath,
+					$basePath . '/bitrix/templates/' . $f,
+					$moduleName,
+					1
+				);
+			}
+
+			process_dir_links(
+				$templatesPath . '/' . $f,
+				$basePath . '/bitrix/templates/' . $f,
+				$moduleName,
+				0,
+				\%commonFiles
+			);
+		}
+	}
+}
+
+sub get_map_repos {
+	my $basePath = shift;
+	my @result = ();
+
+	if (!exists $ENV{'SOLUTION_GIT_REPOS'}) {
+		return @result;
+	}
+
+	my @lines = split(/\n/, $ENV{'SOLUTION_GIT_REPOS'});
+	for my $line (@lines) {
+		$line = trim($line);
+		if ($line eq '') {
+			next;
+		}
+
+		my @tmp = split(';', $line);
+		my $url = trim($tmp[0]);
+		my $moduleId = basename($url, '.git');
+		my $pathModules = $basePath . '/bitrix/modules/';
+
+		my $colNum = scalar(@tmp);
+		my $branch = ($colNum > 1)? trim($tmp[1]) : 'master';
+		my $path = ($colNum > 2)? trim($tmp[2]) : '';
+		if ($path eq '') {
+			$path = $pathModules . $moduleId;
+		}
+		my $page = ($colNum > 3) ? trim($tmp[3]) : '';
+
+		push @result, {
+			'moduleId' => $moduleId,
+			'url' => $url,
+			'branch' => $branch,
+			'path' => $path,
+			'page' => $page,
+		};
+	}
+
+	return \@result;
+}
+
+sub service {
+	my $action = shift;
+	my $name = shift;
+	if (is_wsl() && is_ubuntu()) {
+		sudo("service $name $action");
+	} else {
+		sudo("systemctl $action $name");
+	}
+}
+
+sub tar_archive_create {
+	require_command('tar');
+
+	my $dest = shift;
+	my $src = shift;
+
+	if (!-d $src) {
+		say "Folder $src - not exists.";
+		return;
+	}
+
+	if (-f $dest) {
+		unlink($dest);
+	}
+
+	say "Create archive $dest ...";
+	chdir $src;
+	run 'tar -cf ' . $dest . ' .';
+}
+
+sub has_dir {
+	my $dir = shift;
+	my $destPath = shift;
+
+	opendir(my $dh, $destPath);
+	my @files = readdir($dh);
+	closedir($dh);
+
+	for my $f (@files) {
+		if ($f eq $dir) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+sub node_path {
+	my $basePath = shift;
+
+	my $binPath = '';
+	if (!defined $basePath) {
+		$basePath = get_env('SOLUTION_NODE_BIN');
+		if ($basePath ne '') {
+			$basePath = dirname(get_env('SOLUTION_NODE_BIN'));
+		}
+		$binPath = '';
+	} else {
+		$binPath = '/bin';
+	}
+
+	my $path = $basePath . $binPath;
+	if ($path ne '') {
+		if (index($ENV{'PATH'}, $path) != 0) {
+			$ENV{'PATH'} = $path . ':' . $ENV{'PATH'};
+		}
+	}
+
+	if ($path ne '') {
+		$path .= '/';
+	}
+
+	return $path . 'node'; #TODO 'node' or 'node.cmd'
+}
+
+sub node_tool {
+	my $cmd = shift;
+
+	my $path = dirname(node_path());
+	if ($path eq '.') {
+		$path = '';
+	}
+	if ($path ne '') {
+		$path .= '/';
+	}
+
+	return $path . $cmd;
+}
+
+sub skip_file {
+	my $path = shift;
+
+	if ((index($path, '/.dev/') >= 0)
+			|| (index($path, '/.git/') >= 0)) {
+		return 1;
+	}
+
+	my $name = basename($path);
+	# ?	.umd.js
+	# ?	.pkgd.js
+	# ?	.esm.js
+	# ?	.bundle.js
+	if (($name eq 'webpack.config.js')
+			|| ($name eq 'bundle.config.js')
+			|| ($name eq 'karma.conf.js')
+			|| ($name eq 'gulpfile.js')
+			|| ($name eq 'package.js')) {
+		return 1;
+	}
+
+	return 0;
+}
+
+sub minify_dir {
+	my $basePath = shift;
+	my $toolPath = shift;
+
+	if ($toolPath eq '') {
+		return;
+	}
+	if (! -d $basePath) {
+		return;
+	}
+
+	say "Minify $basePath ...";
+
+	find (sub {
+		my $f = $File::Find::name;
+
+		if (!-f $f) {
+			return;
+		}
+
+		if (skip_file($f)) {
+			return;
+		}
+
+		my $destFile;
+		my $minCss = '.min.css';
+		my $minJs = '.min.js';
+		my $isCss = 0;
+		if ((substr($_, -3) eq '.js') && (substr($_, -7) ne $minJs)) {
+			$destFile = dirname($f) . '/' . basename($f, '.js') . $minJs;
+		} elsif ((substr($_, -4) eq '.css') && (substr($_, -8) ne $minCss)) {
+			$isCss = 1;
+			$destFile = dirname($f) . '/' . basename($f, '.css') . $minCss;
+		} else {
+			return;
+		}
+
+		if (!is_bx_debug()) {
+			say "\t" . remove_base_path($f) . ' -> ' . basename($destFile);
+		}
+
+		my $args = '';
+		if ($isCss) {
+			$args .= ' --loader=css';
+		}
+		$args .= ' --minify';
+
+		run "cat '$f' | $toolPath $args > '$destFile'";
+
+    }, $basePath);
+
+	say '';
+}
+
+sub es6_dir {
+	my $basePath = shift;
+	my $toolPath = shift;
+
+	if ($toolPath eq '') {
+		return;
+	}
+	if (! -d $basePath) {
+		return;
+	}
+
+	say "Transpile $basePath ...";
+
+	find (sub {
+		my $f = $File::Find::name;
+
+		if (!-f $f) {
+			return;
+		}
+
+		if (skip_file($f)) {
+			return;
+		}
+
+		my $destFile;
+		if ((substr($_, -7) eq '.es6.js')) {
+			$destFile = dirname($f) . '/' . basename($f, '.es6.js') . '.js';
+		} else {
+			return;
+		}
+
+		if (!is_bx_debug()) {
+			say "\t" . remove_base_path($f) . ' -> ' . basename($destFile);
+		}
+
+		my $jsOut = exists $ENV{'SOLUTION_JS_OUTPUT'}? $ENV{'SOLUTION_JS_OUTPUT'} : 'ECMASCRIPT_2018';
+		my $args = " --language_in ECMASCRIPT_2021 --language_out " . $jsOut
+			. " --js '$f' --js_output_file '$destFile'";
+
+		run "$toolPath $args";
+
+    }, $basePath);
+
+	say '';
+}
+
+sub process_with_tool {
+	my $basePath = shift;
+	my $onlyCurrentDir = shift;
+	my $tool = shift;
+	my $fn = shift;
+
+	my $path;
+	my $toolPath = node_tool($tool);
+
+	#FIX convert assets to UTF before minify
+	my @actionParams = ('conv', 'utf', $onlyCurrentDir? '.' : '', 'js,css');
+	run_php_action(@actionParams);
+
+	if ($onlyCurrentDir) {
+		$path = getcwd();
+		$fn->($path, $toolPath);
+	} else {
+		my $reposInfoLink = get_map_repos($basePath);
+		my @reposInfo = @{$reposInfoLink};
+		for my $info (@reposInfo) {
+			$path = $info->{'path'};
+			$fn->($path, $toolPath);
+		}
+	}
+}
+
+# actions
+
+sub action_install_php {
+	#if (check_command('php')) {
+	#	return;
+    #}
+	if (is_mingw()) {
+		my $homeBin = $ENV{'HOME'} . '/bin';
+		my $destPath = $homeBin . '/php';
+		my $outputFile = download_binaries('PHP_URLS', $homeBin, $destPath);
+		if (-f $outputFile) {
+			unlink($outputFile);
+		}
+		patch_file($ENV{'HOME'} . '/.profile', 'PATH=$HOME/bin/php:$PATH');
+		#$ENV{'PATH'} = $ENV{'HOME'} . '/bin/php:' . $ENV{'PATH'};
+	} elsif (is_ubuntu()) {
+		my $phpVersion = defined $ARGV[1]? $ARGV[1] : '';
+		install_php($phpVersion);
+	}
+	#TODO!!! add to windows PATH
+}
+
+sub action_install_js {
+	my $basePath = shift;
+
+	my $version = defined $ARGV[1]? $ARGV[1] : '';
+
+	my $homeBin = $ENV{'HOME'} . '/bin';
+	my $destPath = $homeBin . '/node';
+	my $outputFile = download_binaries('NODE' . $version . '_URLS', '', $destPath);
+
+	# check subdir
+	my $path = $destPath;
+	my $dir = basename($outputFile, '.tar.gz', '.zip');
+	if (has_dir($dir, $destPath)) {
+		$path .= '/' . $dir;
+	}
+
+	$path = dirname(node_path($path));
+	say 'Using node from: ' . $path;
+
+	my %packages = (
+		'esbuild' => 'esbuild',
+		'google-closure-compiler' => 'Google Closure Compiler',
+		'@bitrix/cli' => '@bitrix/cli',
+	);
+	for my $package (keys(%packages)) {
+		my $title = $packages{$package};
+		say "Installing  $title ...";
+		run "npm install -g $package";
+		say '';
+	}
+
+	if ($version eq '') {
+		say 'Updating ~/.profile';
+		say "\t" . 'NODE_BIN="' . $path . '"';
+		replace_var_file($ENV{'HOME'} . '/.profile', 'NODE_BIN', $path);
+	}
+}
+
+sub action_minify {
+	my $basePath = shift;
+	my $onlyCurrentDir = defined $ARGV[1]? ($ARGV[1] eq '.') : 0;
+
+	process_with_tool(
+		$basePath,
+		$onlyCurrentDir,
+		'esbuild',
+		\&minify_dir
+	);
+}
+
+sub action_es6 {
+	my $basePath = shift;
+	#my $onlyCurrentDir = defined $ARGV[1]? ($ARGV[1] eq '.') : 0;
+	my $onlyCurrentDir = 1;
+
+	process_with_tool(
+		$basePath,
+		$onlyCurrentDir,
+		'google-closure-compiler',
+		\&es6_dir
+	);
+}
+
+sub action_install_mkcert {
+	my $certKeyName = (exists $ENV{'BX_MKCERT'} && ($ENV{'BX_MKCERT'} ne ''))?
+		$ENV{'BX_MKCERT'} : 'bx.local *.bx.local';
+	$certKeyName = join(' ', map { '"' . $_ . '"' } split(/\s+/, $certKeyName));
+
+	my $srcUrl = 'https://github.com/FiloSottile/mkcert';
+	my $homeBin = $ENV{'HOME'} . '/bin';
+	my $destPath = $homeBin . '/mkcert-src';
+
+	if (is_ubuntu()) {
+		if (-d $destPath) {
+			remove_tree($destPath);
+		}
+
+		sudo('apt install libnss3-tools');
+    	sudo('sudo apt install golang');
+
+    	run("git clone '$srcUrl' '$destPath'");
+		chdir($destPath);
+
+    	run('go build -ldflags "-X main.Version=$(git describe --tags)"');
+
+		if (-l ($homeBin . '/mkcert')) {
+			unlink($homeBin . '/mkcert');
+		}
+		symlink($destPath . '/mkcert', $homeBin . '/mkcert');
+
+		run('mkcert -install');
+
+		my $sslPath = $ENV{'HOME'} . '/.ssl/';
+		if (! -d $sslPath) {
+			mkdir($sslPath);
+		}
+		chdir($sslPath);
+    	run('mkcert ' . $certKeyName);
+
+		sudo('a2enmod ssl');
+    }
+}
+
+sub action_install_lamp {
+	if (is_ubuntu()) {
+		say '';
+		say '# Install php, apache2, mysql and tools...';
+
+        sudo('apt install software-properties-common -y');
+		sudo('add-apt-repository ppa:ondrej/php');
+
+		sudo('apt-get update -y');
+
+		sudo('apt install unzip wget curl dos2unix pwgen sshpass screen');
+		sudo('apt install'
+			. ' apache2 libapache2-mod-fcgid'
+            . ' mysql-server mysql-client'
+            . ' php libapache2-mod-php'
+        );
+
+		install_php();
+
+		# sudo adduser bitrix www-data
+		sudo('usermod -a -G www-data ' . $ENV{'USER'});
+		sudo('chmod 755 ~/');
+		run('chmod +x /home/' . $ENV{'USER'});
+		my $homePath = $ENV{'HOME'};
+		my $extWww = $homePath . '/ext_www';
+		if (! -d $extWww) {
+			mkdir $extWww;
+		}
+
+		#TODO ??? patch  /etc/apache2/apache2.conf -> <Directory /> -> AllowOverride All
+		#say 'Add to /etc/apache2/apache2.conf -> <Directory />';
+		#say '	AllowOverride All';
+		#say '	Require all granted';
+		#say '';
+		# ???
+		#<Directory /home/bitrix/work/>
+		#	Options Indexes FollowSymLinks
+		#	AllowOverride All
+		#	Require all granted
+		#</Directory>
+
+		sudo('a2enmod php');
+
+		sudo('a2enmod actions');
+		sudo('a2enmod fcgid');
+		sudo('a2enmod alias');
+		sudo('a2enmod proxy_fcgi');
+
+		sudo('a2enmod rewrite');
+		sudo('a2enmod proxy');
+		sudo('a2enmod proxy_http');
+
+        sudo('apt install msmtp');
+
+        sudo('apt install optipng jpegoptim pngquant');
+
+        #sudo('apt install rinetd');
+
+		#TODO!!! версии ниже ?7.2 не работают с mysql8 из коробки
+        #sudo('apachectl configtest')
+        # global switch php (для основной версии mod_php)
+        #sudo('a2dismod php7.4')
+        #sudo('a2enmod php')
+
+		say '';
+		say '# Mysql config setup...';
+		sudo('mysql_secure_installation');
+		say '';
+		say '# Mysql config check...';
+		sudo('mysqladmin -p -u root version');
+
+		my $mysqlContent = file_get_contents(dirname($RealBin) . '/.template/ubuntu/bitrix.my.cnf');
+		sudo_patch_file('/etc/mysql/my.cnf', $mysqlContent);
+
+		say '';
+		say '# Mail sender setup...';
+		copy(dirname($RealBin) . '/.template/.msmtprc', $homePath . '/.msmtprc');
+		sudo('chown www-data:www-data ' . $homePath . '/.msmtprc');
+		sudo('chmod 0600 ' . $homePath . '/.msmtprc');
+		if (-f '/etc/msmtprc') {
+			sudo('unlink /etc/msmtprc');
+		}
+		sudo('ln -s ' . $homePath . '/.msmtprc /etc/msmtprc');
+
+		say '';
+		say '# Setup locale for windows-1251...';
+		sudo('locale-gen ru_RU.CP1251');
+		sudo('dpkg-reconfigure locales');
+
+		# check locale:
+		#	`locale -a | grep ru`
+		#	`less /usr/share/i18n/SUPPORTED | grep ru_RU | grep CP1251`
+		# for centos:
+		#	`localedef -c -i ru_RU -f CP1251 ru_RU.CP1251`
+	}
+}
+
+sub action_install {
+	# on windows HOME: $ENV{'USERPROFILE'}
+
+	my $homeBin = $ENV{'HOME'} . '/bin';
+    if (!-d $homeBin) {
+        mkdir($homeBin);
+    }
+
+	my $fnameEnv = dirname($RealBin) . '/.env';
+	if (!(-f $fnameEnv)) {
+		copy(dirname($RealBin) . '/.env.example', $fnameEnv);
+	}
+
+	if (is_mingw()) {
+		patch_file($ENV{'HOME'} . '/.profile', 'export MSYS=winsymlinks:native');
+    }
+
+	my $homeScript = $homeBin . '/' . $Script;
+	if (-l $homeScript) {
+		unlink($homeScript);
+	}
+	symlink($RealBin . '/' . $Script, $homeScript);
+
+	action_install_php();
 }
 
 sub action_fetch {
@@ -961,35 +1619,6 @@ sub action_env {
 	}
 }
 
-sub path2wsl {
-	my $path = shift;
-
-	my $distroName = exists $ENV{'WSL_DISTRO_NAME'}? $ENV{'WSL_DISTRO_NAME'} : 'Ubuntu';
-
-	$path = abs_path($path); #FIX for symlinks
-
-	my $result = '\\\wsl.localhost\\' . $distroName . $path;
-
-	return $result;
-}
-
-sub get_filezilla_command {
-	my $conn_str = shift;
-	my $basePath = shift;
-	my $exePath = shift;
-
-	if (!$exePath || ($exePath eq '')) {
-		$exePath = 'filezilla';
-	}
-
-	if (is_wsl())
-	{
-		$basePath = path2wsl($basePath);
-	}
-
-	return $exePath . " '" . $conn_str . "' --local='" . $basePath . "'";
-}
-
 sub action_ftp {
 	my $basePath = shift;
 	require_site_root($basePath);
@@ -1038,34 +1667,21 @@ sub action_putty {
 	run putty_exec_remote('', 1);
 }
 
-sub service {
-	my $action = shift;
-	my $name = shift;
-	if (is_wsl() && is_ubuntu()) {
-		sudo("service $name $action");
-	} else {
-		sudo("systemctl $action $name");
+sub action_solution_links {
+	my $basePath = shift;
+	require_site_root($basePath);
+
+	my $reposInfoLink = get_map_repos($basePath);
+	my @reposInfo = @{$reposInfoLink};
+	for my $info (@reposInfo) {
+		my $modulePath = $info->{'path'};
+		my $moduleName = basename($info->{'moduleId'});
+		process_module_links(
+			$basePath,
+			$modulePath,
+			$moduleName
+		);
 	}
-}
-
-sub tar_archive_create {
-	require_command('tar');
-
-	my $dest = shift;
-	my $src = shift;
-
-	if (!-d $src) {
-		say "Folder $src - not exists.";
-		return;
-	}
-
-	if (-f $dest) {
-		unlink($dest);
-	}
-
-	say "Create archive $dest ...";
-	chdir $src;
-	run 'tar -cf ' . $dest . ' .';
 }
 
 # main
@@ -1111,8 +1727,16 @@ my %actions = (
 		'fn' => \&action_install_php,
 	},
 
+	'install-js' => {
+		'fn' => \&action_install_js,
+	},
+
 	'install-lamp' => {
 		'fn' => \&action_install_lamp,
+	},
+
+	'install-mkcert' => {
+		'fn' => \&action_install_mkcert,
 	},
 
 	'fetch' => {
@@ -1122,13 +1746,6 @@ my %actions = (
 	'env' => {
 		'fn' => \&action_env,
 	},
-
-	#'env-init' => {
-	# TODO!!! как инициализировать переменные только в текущем терминале? - чтобы установить окружение (переменные) для PHP, NODE и т д
-	# bx env-init
-	# npm install ...
-	# php -v
-	#},
 
 	'ftp' => {
 		'fn' => \&action_ftp,
@@ -1145,28 +1762,43 @@ my %actions = (
 	'putty' => {
 		'fn' => \&action_putty,
 	},
+
+	'solution-links' => {
+		'fn' => \&action_solution_links,
+	},
+
+	'minify' => {
+		'fn' => \&action_minify,
+	},
+
+	'es6' => {
+		'fn' => \&action_es6,
+	},
 );
 
+sub run_php_action {
+	my @params = @_;
+	our $site_root;
+
+	$ENV{'DOCUMENT_ROOT'} = $site_root;
+
+	my $cliPath = dirname($RealBin) . '/include.php';
+	my $args = "'" . join("' '", @params) . "'";
+
+	run("php '$cliPath' '$site_root' $args", '', 1);
+}
+
 my $action = '';
-my $actionNotExists = 0;
 if (scalar @ARGV > 0) {
 	$action = $ARGV[0];
 } else {
 	$action = 'help';
-	$actionNotExists = 1;
 }
 if ($action ne '') {
 	if (exists $actions{$action}) {
 		my $actionFn = $actions{$action}->{'fn'};
 		$actionFn->($site_root);
 	} else {
-		my $args = join(' ', @ARGV);
-		my $cliPath = dirname($RealBin) . '/include.php';
-		$ENV{'DOCUMENT_ROOT'} = $site_root;
-		if ($actionNotExists == 1)
-		{
-			$args = $action;
-		}
-		run "php '$cliPath' '$site_root' $args";
+		run_php_action(@ARGV);
 	}
 }

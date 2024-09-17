@@ -11,6 +11,8 @@ final class Encoding
 		'php',
 		'xml',
 		'json',
+		'js',
+		'css',
 	];
 
 	public static function getWithoutComments($content)

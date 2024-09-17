@@ -36,6 +36,7 @@ function initBitrixCli()
 function runCommand($script, $siteRootPath, $params)
 {
 	$actionName = array_shift($params) ?? '';
+	$originalActionName = $actionName;
 	$actionName = str_replace('-', '', $actionName);
 	if (empty($actionName))
 	{
@@ -48,7 +49,7 @@ function runCommand($script, $siteRootPath, $params)
 	{
 		$className = '\\Rodzeta\\Siteoptions\\Wrapper';
 
-		$action = new $className($script, $siteRootPath, $params, $actionName);
+		$action = new $className($script, $siteRootPath, $params, $originalActionName);
 	}
 	else
 	{

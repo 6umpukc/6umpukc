@@ -7,11 +7,6 @@ use Rodzeta\Siteoptions\Shell;
 
 final class Db extends Base
 {
-	public function getName()
-	{
-		return 'db';
-	}
-
 	public function getDescription()
 	{
 		return 'bx ' . $this->getName() . ' - Открыть adminer.php';

@@ -7,11 +7,6 @@ use Rodzeta\Siteoptions\Shell;
 
 final class Checkout extends Base
 {
-	public function getName()
-	{
-		return 'checkout';
-	}
-
 	public function getDescription()
 	{
 		return 'bx ' . $this->getName() . ' - Переключится на ветку git-репозитария решения' . "\n"

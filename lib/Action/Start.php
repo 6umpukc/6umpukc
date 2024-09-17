@@ -7,11 +7,6 @@ use Rodzeta\Siteoptions\Shell;
 
 final class Start extends Base
 {
-	public function getName()
-	{
-		return 'start';
-	}
-
 	public function getDescription()
 	{
 		return 'bx ' . $this->getName() . ' - Запустить сервисы LAMP и т.д.';

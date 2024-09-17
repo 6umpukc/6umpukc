@@ -7,11 +7,6 @@ use Rodzeta\Siteoptions\Shell;
 
 final class Stop extends Base
 {
-	public function getName()
-	{
-		return 'stop';
-	}
-
 	public function getDescription()
 	{
 		return 'bx ' . $this->getName() . ' - Остановить сервисы LAMP и т.д.';

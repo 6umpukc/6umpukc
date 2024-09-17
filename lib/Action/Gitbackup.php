@@ -49,16 +49,21 @@ final class Gitbackup extends Base
 
 			$name = $this->git->getName($repo);
 			$path = $destPath . '/' . $name;
+			$archivePath = $destPathArchived . $name . '.tar';
 
 			chdir($destPath);
 
 			if (is_dir($path))
 			{
 				chdir($path);
-				Shell::run('git pull', $resultGitPull);
+				Shell::runGetContent('git pull', $resultGitPull);
+
 				if (mb_strpos($resultGitPull, 'Already up to date') !== false)
 				{
-					continue;
+					if (file_exists($archivePath))
+					{
+						continue;
+					}
 				}
 			}
 			else
@@ -67,7 +72,6 @@ final class Gitbackup extends Base
 				Shell::run('git clone ' . $repo);
 			}
 
-			$archivePath = $destPathArchived . $name . '.tar';
 			Shell::tarCreate($archivePath, $path);
 
 			echo "\n";

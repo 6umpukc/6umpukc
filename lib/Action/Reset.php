@@ -7,11 +7,6 @@ use Rodzeta\Siteoptions\Shell;
 
 final class Reset extends Base
 {
-	public function getName()
-	{
-		return 'reset';
-	}
-
 	public function getDescription()
 	{
 		return 'bx ' . $this->getName() . ' - Сбросить изменения по git-репозитариям решения' . "\n"
@@ -29,6 +24,7 @@ final class Reset extends Base
 		{
 			Shell::run('pwd');
 			Shell::run('git reset --hard HEAD');
+			Shell::run('git clean -f -d');
 		}
 	}
 }

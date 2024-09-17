@@ -7,11 +7,6 @@ use Rodzeta\Siteoptions\Shell;
 
 final class Vpn extends Base
 {
-	public function getName()
-	{
-		return 'vpn';
-	}
-
 	public function getDescription()
 	{
 		return 'bx ' . $this->getName() . ' - Подключится по VPN';
@@ -29,16 +24,13 @@ final class Vpn extends Base
 		$password = $_SERVER['VPN_PASSWORD'];
 
 		$home = Shell::getWinEnvVariable('USERPROFILE');
-		$script = $home . '/bin/win_cisco_autologin.js';
+		$script = $home . '/bin/bx_cisco_autologin.js';
 
-		ob_start();
-		Shell::run(
-			'cscript.exe "' . $script . '"'
-			. ' "' . $host . '"'
-			. ' "' . $username . '"'
-			. ' "' . $password . '"'
-			. ' 2>/dev/null'
-		);
-		ob_end_clean();
+		Shell::runCScript([
+			$script,
+			$host,
+			$username,
+			$password,
+		]);
 	}
 }

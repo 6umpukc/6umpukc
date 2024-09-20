@@ -32,7 +32,7 @@ final class Db extends Base
 
 		if (Shell::isWSL())
 		{
-			Shell::runWinCmd('start "' . $url . '"', $output);
+			Shell\Win::run('start "' . $url . '"', $output);
 		}
 		else
 		{

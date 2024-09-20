@@ -27,7 +27,7 @@ final class Sitehosts extends Base
 
 		if (Shell::isWSL())
 		{
-			$etcHostsPathWin = Shell::getWinEnvVariable('systemroot') . '\\system32\\drivers\\etc\\hosts';
+			$etcHostsPathWin = Shell\Win::getEnvVariable('systemroot') . '\\system32\\drivers\\etc\\hosts';
 			$etcHostsPath = Shell::convertToWinPath($etcHostsPathWin);
 		}
 

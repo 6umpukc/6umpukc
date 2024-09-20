@@ -26,7 +26,7 @@ final class Shell
 		return trim($line) == 'yes';
 	}
 
-	protected static function printCommand($cmd)
+	public static function printCommand($cmd)
 	{
 		if (isset($_SERVER['BX_DEBUG']) && ($_SERVER['BX_DEBUG'] == '1'))
 		{
@@ -105,50 +105,6 @@ final class Shell
 		$result = trim($m[0]);
 
 		static::updateEnv($name, $result);
-
-		return $result;
-	}
-
-	public static function runWinCmd($command, &$output)
-	{
-		$command = str_replace('&', '^&', $command);
-		$cmd = 'cmd.exe /c ' . $command . ' 2>/dev/null';
-
-		static::printCommand($cmd);
-
-		return exec($cmd, $output);
-	}
-
-	public static function runCScript($arguments = [])
-	{
-		if (empty($arguments))
-		{
-			return;
-		}
-
-		$args = '"' . implode('" "', $arguments) . '"';
-		$cmd = 'cscript.exe ' . $args;
-		$cmd = str_replace('&', '^&', $cmd);
-
-		static::printCommand($cmd);
-
-		ob_start();
-		$result = static::run($cmd . ' 2>/dev/null');
-		ob_end_clean();
-
-		return $result;
-	}
-
-	public static function getWinEnvVariable($name)
-	{
-		$result = '';
-
-		if (trim($name) == '')
-		{
-			return $result;
-		}
-
-		$result = trim(static::runWinCmd('echo "%' . $name . '%"', $output));
 
 		return $result;
 	}

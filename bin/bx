@@ -16,6 +16,14 @@ use Data::Dumper;
 #use lib "$RealBin/vendor/lib/perl5";
 #use Text::CSV;
 
+#use lib '.';
+#use Files qw(
+#	file_get_contents
+#	file_put_contents
+#	file_get_contents_win
+#	file_put_contents_win
+#);
+
 # common functions
 
 sub init_default_env {
@@ -56,7 +64,7 @@ sub init_default_env {
 
 sub is_site_env {
 	my $path = shift;
-	my $configContent = file_get_contents($path . '/.env');
+	my $configContent = X::File::get($path . '/.env');
 
 	if ((index($configContent, 'APP_URL=') >= 0)
 			|| (index($configContent, 'SOLUTION_GIT_REPOS=') >= 0)) {
@@ -114,7 +122,7 @@ sub load_env {
 	my %result = ();
 
 	my $isMultiline = 0;
-	my @lines = split("\n", file_get_contents($path));
+	my @lines = split("\n", X::File::get($path));
 	my $key = '';
 	my $value = '';
 	for my $line (@lines)
@@ -178,50 +186,6 @@ sub is_mingw {
 
 sub is_windows_32bit {
 	return (index($ENV{'PROCESSOR_ARCHITECTURE'}, 'x86') >= 0)? 1 : 0;
-}
-
-sub file_get_contents {
-    my $filename = shift;
-    my $result = '';
-    if (open(my $fh, '<:encoding(UTF-8)', $filename)) {
-        while (my $line = <$fh>) {
-            $result .= $line;
-        }
-    }
-    return $result;
-}
-
-sub file_put_contents {
-    my $filename = shift;
-    my $content = shift;
-    if (open(my $fh, '>:encoding(UTF-8)', $filename)) {
-        print $fh $content;
-        close $fh;
-        return 1;
-    }
-    return 0;
-}
-
-sub file_get_contents_win {
-	my $filename = shift;
-    my $result = '';
-    if (open(my $fh, '<:encoding(Windows-1251)', $filename)) {
-        while (my $line = <$fh>) {
-            $result .= $line;
-        }
-    }
-    return $result;
-}
-
-sub file_put_contents_win {
-	my $filename = shift;
-    my $content = shift;
-    if (open(my $fh, '>:encoding(Windows-1251)', $filename)) {
-        print $fh $content;
-        close $fh;
-        return 1;
-    }
-    return 0;
 }
 
 sub trim {
@@ -334,7 +298,9 @@ sub any_archive_extract {
 }
 
 sub request_useragent {
-    return 'Mozilla/5.0 (X11; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0';
+	return (exists($ENV{'BX_USER_AGENT'}) && ($ENV{'BX_USER_AGENT'} ne ''))?
+		$ENV{'BX_USER_AGENT'}
+		: 'Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0';
 }
 
 sub request_get {
@@ -413,13 +379,13 @@ sub patch_file {
 	my $fixContent = shift;
 
 	if (-f $fname) {
-		my $originalContent = file_get_contents($fname);
+		my $originalContent = X::File::get($fname);
 		if (index($originalContent, $fixContent) < 0) {
-			file_put_contents($fname, $originalContent . "\n" . $fixContent . "\n");
+			X::File::put($fname, $originalContent . "\n" . $fixContent . "\n");
 		}
 	}
 	else {
-		file_put_contents($fname, "\n" . $fixContent . "\n");
+		X::File::put($fname, "\n" . $fixContent . "\n");
 	}
 }
 
@@ -432,10 +398,10 @@ sub sudo_patch_file {
 	}
 	my $path = $ENV{'HOME'};
 	my $tmp = $path . '/.patch.' . basename($fname) . '.tmp';
-	my $originalContent = file_get_contents($fname);
+	my $originalContent = X::File::get($fname);
 	if (index($originalContent, $content) < 0) {
 		$content = $originalContent . "\n" . $content . "\n";
-		file_put_contents($tmp, $content);
+		X::File::put($tmp, $content);
 		sudo("mv '" . $tmp . "' " . $fname);
 	}
 }
@@ -449,10 +415,10 @@ sub replace_var_file {
 		return;
 	}
 
-	my $content = file_get_contents($fname);
+	my $content = X::File::get($fname);
 	if ($content =~ /$name\=".+?"/) {
 		$content =~ s/$name\=".+?"/$name="$value"/;
-		file_put_contents($fname, $content);
+		X::File::put($fname, $content);
 	}
 }
 
@@ -728,7 +694,7 @@ sub install_php {
 	);
 
 	# patch configs
-	my $phpContent = file_get_contents(dirname($RealBin) . '/.template/bitrix.php.ini');
+	my $phpContent = X::File::get(dirname($RealBin) . '/.template/bitrix.php.ini');
 	my @phpDirs = glob('/etc/php/*');
 	my @tmp = map { basename($_) } sort { $b cmp $a } @phpDirs;
 
@@ -1260,6 +1226,18 @@ sub process_with_tool {
 	}
 }
 
+sub run_php_action {
+	my @params = @_;
+	our $site_root;
+
+	$ENV{'DOCUMENT_ROOT'} = $site_root;
+
+	my $cliPath = dirname($RealBin) . '/include.php';
+	my $args = "'" . join("' '", @params) . "'";
+
+	run("php '$cliPath' '$site_root' $args", '', 1);
+}
+
 # actions
 
 sub action_install_php {
@@ -1456,7 +1434,7 @@ sub action_install_lamp {
 		say '# Mysql config check...';
 		sudo('mysqladmin -p -u root version');
 
-		my $mysqlContent = file_get_contents(dirname($RealBin) . '/.template/ubuntu/bitrix.my.cnf');
+		my $mysqlContent = X::File::get(dirname($RealBin) . '/.template/ubuntu/bitrix.my.cnf');
 		sudo_patch_file('/etc/mysql/my.cnf', $mysqlContent);
 
 		say '';
@@ -1776,18 +1754,6 @@ my %actions = (
 	},
 );
 
-sub run_php_action {
-	my @params = @_;
-	our $site_root;
-
-	$ENV{'DOCUMENT_ROOT'} = $site_root;
-
-	my $cliPath = dirname($RealBin) . '/include.php';
-	my $args = "'" . join("' '", @params) . "'";
-
-	run("php '$cliPath' '$site_root' $args", '', 1);
-}
-
 my $action = '';
 if (scalar @ARGV > 0) {
 	$action = $ARGV[0];
@@ -1802,3 +1768,64 @@ if ($action ne '') {
 		run_php_action(@ARGV);
 	}
 }
+
+# --- packages
+
+package X::File;
+
+use 5.016;
+use warnings;
+
+#use Exporter qw(import);
+
+sub get {
+    my $filename = shift;
+    my $result = '';
+    if (open(my $fh, '<:encoding(UTF-8)', $filename)) {
+        while (my $line = <$fh>) {
+            $result .= $line;
+        }
+    }
+    return $result;
+}
+
+sub put {
+    my $filename = shift;
+    my $content = shift;
+    if (open(my $fh, '>:encoding(UTF-8)', $filename)) {
+        print $fh $content;
+        close $fh;
+        return 1;
+    }
+    return 0;
+}
+
+sub get_win {
+	my $filename = shift;
+    my $result = '';
+    if (open(my $fh, '<:encoding(Windows-1251)', $filename)) {
+        while (my $line = <$fh>) {
+            $result .= $line;
+        }
+    }
+    return $result;
+}
+
+sub put_win {
+	my $filename = shift;
+    my $content = shift;
+    if (open(my $fh, '>:encoding(Windows-1251)', $filename)) {
+        print $fh $content;
+        close $fh;
+        return 1;
+    }
+    return 0;
+}
+
+#our @EXPORT = qw(
+#	file_get_contents
+#	file_put_contents
+#	file_get_contents_win
+#	file_put_contents_win
+#);
+#1;

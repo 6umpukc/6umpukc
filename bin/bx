@@ -2,7 +2,6 @@
 
 use 5.016;
 use warnings;
-no if $] >= 5.018000, warnings => 'experimental::smartmatch';
 
 use FindBin qw($RealBin $Bin $Script);
 use Cwd qw(cwd getcwd abs_path);
@@ -27,8 +26,8 @@ use Data::Dumper;
 # common functions
 
 sub init_default_env {
-	$ENV{'PHP_URLS_WIN32'} = 'https://windows.php.net/downloads/releases/php-8.2.22-Win32-vs16-x86.zip';
-	$ENV{'PHP_URLS_WIN64'} = 'https://windows.php.net/downloads/releases/php-8.2.22-Win32-vs16-x64.zip';
+	$ENV{'PHP_URLS_WIN32'} = 'https://windows.php.net/downloads/releases/php-8.2.27-Win32-vs16-x86.zip';
+	$ENV{'PHP_URLS_WIN64'} = 'https://windows.php.net/downloads/releases/php-8.2.27-Win32-vs16-x64.zip';
 	$ENV{'PHP_URLS_MACOS'} = '';
 	$ENV{'PHP_URLS_LINUX'} = '';
 
@@ -178,7 +177,9 @@ sub load_env {
 
 sub is_mingw {
     my $msystem = exists $ENV{'MSYSTEM'} ? $ENV{'MSYSTEM'} : '';
-	if ($msystem ~~ ['MINGW64', 'MINGW32', 'MSYS']) {
+	if (($msystem eq 'MINGW64')
+			or ($msystem eq 'MINGW32')
+			or ($msystem eq 'MSYS')) {
         return 1;
     }
     return 0;
@@ -1373,31 +1374,32 @@ sub action_install_lamp {
 
 		sudo('apt-get update -y');
 
-		sudo('apt install unzip wget curl dos2unix pwgen sshpass screen');
-		sudo('apt install'
-			. ' apache2 libapache2-mod-fcgid'
-            . ' mysql-server mysql-client'
-            . ' php libapache2-mod-php'
-        );
+		setup_tool();
+		setup_php();
+		setup_mysql();
+		setup_mail();
+		#setup_locale_for_win1251();
+	}
+}
+
+sub setup_php {
+		say '';
+		say '# PHP Setup...';
+
+		sudo('apt install apache2 php libapache2-mod-fcgid libapache2-mod-php');
 
 		install_php();
 
-		# sudo adduser bitrix www-data
 		sudo('usermod -a -G www-data ' . $ENV{'USER'});
 		sudo('chmod 755 ~/');
 		run('chmod +x /home/' . $ENV{'USER'});
-		my $homePath = $ENV{'HOME'};
-		my $extWww = $homePath . '/ext_www';
-		if (! -d $extWww) {
-			mkdir $extWww;
-		}
 
-		#TODO ??? patch  /etc/apache2/apache2.conf -> <Directory /> -> AllowOverride All
-		#say 'Add to /etc/apache2/apache2.conf -> <Directory />';
-		#say '	AllowOverride All';
-		#say '	Require all granted';
-		#say '';
-		# ???
+		#my $extWww = $homePath . '/ext_www';
+		#if (! -d $extWww) {
+		#	mkdir $extWww;
+		#}
+
+		#TODO??? fix
 		#<Directory /home/bitrix/work/>
 		#	Options Indexes FollowSymLinks
 		#	AllowOverride All
@@ -1414,50 +1416,61 @@ sub action_install_lamp {
 		sudo('a2enmod rewrite');
 		sudo('a2enmod proxy');
 		sudo('a2enmod proxy_http');
+}
 
-        sudo('apt install msmtp');
+sub setup_tool {
+	say '';
+	say '# Tools setup...';
 
-        sudo('apt install optipng jpegoptim pngquant');
+	sudo('apt install unzip wget curl dos2unix pwgen sshpass screen');
+	sudo('apt install optipng jpegoptim pngquant');
+	#sudo('apt install rinetd');
+}
 
-        #sudo('apt install rinetd');
+sub setup_mysql {
+	say '';
+	say '# Mysql config setup...';
 
-		#TODO!!! версии ниже ?7.2 не работают с mysql8 из коробки
-        #sudo('apachectl configtest')
-        # global switch php (для основной версии mod_php)
-        #sudo('a2dismod php7.4')
-        #sudo('a2enmod php')
+	sudo('apt install mysql-server mysql-client');
+	sudo('mysql_secure_installation');
 
-		say '';
-		say '# Mysql config setup...';
-		sudo('mysql_secure_installation');
-		say '';
-		say '# Mysql config check...';
-		sudo('mysqladmin -p -u root version');
+	say '';
+	say '# Mysql config check...';
+	sudo('mysqladmin -p -u root version');
 
-		my $mysqlContent = X::File::get(dirname($RealBin) . '/.template/ubuntu/bitrix.my.cnf');
-		sudo_patch_file('/etc/mysql/my.cnf', $mysqlContent);
+	my $mysqlContent = X::File::get(dirname($RealBin) . '/.template/ubuntu/bitrix.my.cnf');
+	sudo_patch_file('/etc/mysql/my.cnf', $mysqlContent);
+}
 
-		say '';
-		say '# Mail sender setup...';
-		copy(dirname($RealBin) . '/.template/.msmtprc', $homePath . '/.msmtprc');
-		sudo('chown www-data:www-data ' . $homePath . '/.msmtprc');
-		sudo('chmod 0600 ' . $homePath . '/.msmtprc');
-		if (-f '/etc/msmtprc') {
-			sudo('unlink /etc/msmtprc');
-		}
-		sudo('ln -s ' . $homePath . '/.msmtprc /etc/msmtprc');
+sub setup_mail {
+	my $homePath = $ENV{'HOME'};
 
-		say '';
-		say '# Setup locale for windows-1251...';
-		sudo('locale-gen ru_RU.CP1251');
-		sudo('dpkg-reconfigure locales');
+	say '';
+	say '# Mail sender setup...';
 
-		# check locale:
-		#	`locale -a | grep ru`
-		#	`less /usr/share/i18n/SUPPORTED | grep ru_RU | grep CP1251`
-		# for centos:
-		#	`localedef -c -i ru_RU -f CP1251 ru_RU.CP1251`
+	sudo('apt install msmtp');
+
+	copy(dirname($RealBin) . '/.template/.msmtprc', $homePath . '/.msmtprc');
+	sudo('chown www-data:www-data ' . $homePath . '/.msmtprc');
+	sudo('chmod 0600 ' . $homePath . '/.msmtprc');
+
+	if (-f '/etc/msmtprc') {
+		sudo('unlink /etc/msmtprc');
 	}
+	sudo('ln -s ' . $homePath . '/.msmtprc /etc/msmtprc');
+}
+
+sub setup_locale_for_win1251 {
+	say '';
+	say '# Setup locale for windows-1251...';
+	sudo('locale-gen ru_RU.CP1251');
+	sudo('dpkg-reconfigure locales');
+
+	# check locale:
+	#	`locale -a | grep ru`
+	#	`less /usr/share/i18n/SUPPORTED | grep ru_RU | grep CP1251`
+	# for centos:
+	#	`localedef -c -i ru_RU -f CP1251 ru_RU.CP1251`
 }
 
 sub action_install {
@@ -1530,7 +1543,9 @@ sub action_fetch {
     	die('Error on loading bitrix edition or script ' . $srcUrl);
   	}
 
-	if ($edition ~~ ['setup', 'restore', 'test']) {
+	if (($edition eq 'setup')
+			or ($edition eq 'restore')
+			or ($edition eq 'test')) {
 		return;
 	}
 
@@ -1581,13 +1596,11 @@ sub action_env {
 	for my $k (sort (keys %config)) {
 		my $value = $ENV{$k};
 
-		if ($k ~~ [
-				'BX_SITE_CONFIG_DEST',
-				'BX_SITE_CONFIG_SRC',
-				'BX_BACKUP_GIT_REPOS_DEST',
-				'BX_BACKUP_GIT_REPOS',
-				'SOLUTION_GIT_REPOS',
-			]) {
+		if (($k eq 'BX_SITE_CONFIG_DEST')
+				or ($k eq 'BX_SITE_CONFIG_SRC')
+				or ($k eq 'BX_BACKUP_GIT_REPOS_DEST')
+				or ($k eq 'BX_BACKUP_GIT_REPOS')
+				or ($k eq 'SOLUTION_GIT_REPOS')) {
 			$value = '...';
 		} elsif (index($value, "\t") >= 0) {
 			$value = "\n\t" . join("\n\t", split("\t", $value)) . "\n";

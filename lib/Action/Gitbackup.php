@@ -70,6 +70,7 @@ final class Gitbackup extends Base
 			{
 				chdir($destPath);
 				Shell::run('git clone ' . $repo);
+				//Shell::run('git clone --mirror ' . $repo . ' ' . $path);
 			}
 
 			Shell::tarCreate($archivePath, $path);

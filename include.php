@@ -4,7 +4,7 @@ namespace Rodzeta\Siteoptions;
 
 use Throwable;
 
-// php ~/bin/rodzeta.siteoptions/include.php [arg1] [arg2] [arg3]
+// php ~/bin/6umpukc/include.php [arg1] [arg2] [arg3]
 
 function initBitrixCli()
 {

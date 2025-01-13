@@ -1,4 +1,4 @@
-<?
+<?php
 ########## Proxy config ######
 $proxyAddr = "";
 $proxyPort = "";
@@ -11,27 +11,44 @@ header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
 header("Expires: 0");
 header("Pragma: public");
 
-error_reporting(E_ALL &~ E_NOTICE);
-if(version_compare(phpversion(), '5.3.0') == -1)
-	die('PHP 5.3.0 or higher is required!');
+error_reporting(E_ALL & ~E_NOTICE);
 
-if(!function_exists('gzopen'))
+if (version_compare(phpversion(), '8.0.0') == -1)
+{
+	die('PHP 8.0.0 or higher is required!');
+}
+
+if (!function_exists('gzopen'))
+{
 	die('zlib module is not installed!');
+}
 
-ob_implicit_flush(true);
+ob_implicit_flush();
 set_time_limit(1800);
-define('TIMEOUT',10);
 
-if (@preg_match('#ru#i',$_SERVER['HTTP_ACCEPT_LANGUAGE']))
-	$lang = 'ru';
-elseif (@preg_match('#de#i',$_SERVER['HTTP_ACCEPT_LANGUAGE']))
-	$lang = 'de';
+define('TIMEOUT', 10);
 
-if ($_REQUEST['lang'])
+if (isset($_REQUEST['lang']))
+{
 	$lang = $_REQUEST['lang'];
 
-if (!in_array($lang,array('ru','en','de')))
+	if (!in_array($lang, ['ru','en','de']))
+	{
+		$lang = 'en';
+	}
+}
+elseif (preg_match('#ru#i', $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? ''))
+{
+	$lang = 'ru';
+}
+elseif (preg_match('#de#i', $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? ''))
+{
+	$lang = 'de';
+}
+else
+{
 	$lang = 'en';
+}
 
 define("LANG", $lang);
 define('UPDATE_FLAG', dirname(__FILE__).'/bitrixsetup.update');
@@ -40,18 +57,24 @@ $this_script_name = basename(__FILE__);
 
 umask(0);
 if (file_exists($file = $_SERVER['DOCUMENT_ROOT'].'/bitrix/php_interface/dbconn.php'))
+{
 	include($file);
+}
 
 $debug = file_exists(dirname(__FILE__).'/bitrixsetup.debug');
 
 if (!defined("BX_DIR_PERMISSIONS"))
+{
 	define("BX_DIR_PERMISSIONS", 0755);
+}
 
 if (!defined("BX_FILE_PERMISSIONS"))
+{
 	define("BX_FILE_PERMISSIONS", 0644);
+}
 
-$strAction = $_REQUEST["action"];
-$edition = $_REQUEST['edition'];
+$strAction = $_REQUEST["action"] ?? '';
+$edition = $_REQUEST['edition'] ?? 0;
 
 if ($short = (getenv('BITRIX_ENV_TYPE') == 'crm'))
 {
@@ -140,222 +163,225 @@ else
 	);
 }
 $single = count($arEditions[LANG]) == 1;
-####### MESSAGES ########
-$MESS = array();
-$ar = array();
+
 if (LANG == "ru")
 {
-	$MESS["NO_PERMS"] = "Нет прав на запись в файл ";
-	$MESS["LOADER_LICENSE_KEY"] = "Лицензионный ключ";
-	$MESS["INTRANET"] = "Корпоративный портал";
-	$MESS["LOADER_TITLE"] = "Загрузка продуктов \"1С-Битрикс\"";
-	$MESS["UPDATE_SUCCESS"] = "Обновлено успешно. <a href='?'>Открыть</a>.";
-	$MESS["LOADER_NEW_STEPS"] = "Загрузка продуктов \"1С-Битрикс\"";
-	$MESS["LOADER_SUBTITLE1"] = "Загрузка продукта";
-	$MESS["LOADER_SUBTITLE2"] = "1С-Битрикс";
-	$MESS["LOADER_MENU_LIST"] = "Выбор продукта";
-	$MESS["LOADER_MENU_LOAD"] = "Загрузка дистрибутива с сервера";
-	$MESS["LOADER_MENU_UNPACK"] = "Распаковка дистрибутива";
-	$MESS["LOADER_TECHSUPPORT"] = "";
-	$MESS["LOADER_TITLE_LIST"] = "Выбор дистрибутива";
-	$MESS["LOADER_TITLE_LOAD"] = "Загрузка дистрибутива на сайт";
-	$MESS["LOADER_TITLE_UNPACK"] = "Распаковка дистрибутива";
-	$MESS["LOADER_TITLE_LOG"] = "Отчет по загрузке";
-	$MESS["LOADER_SAFE_MODE_ERR"] = "<font color=\"#FF0000\"><b>Внимание!</b></font> PHP на вашем сайте работает в Safe Mode. Установка продукта в автоматическом режиме невозможна. Пожалуйста, обратитесь в службу технической поддержки для получения дополнительной информации.";
-	$MESS["LOADER_NO_PERMS_ERR"] = "<font color=\"#FF0000\"><b>Внимание!</b></font> PHP не имеет прав на запись в корневую папку #DIR# вашего сайта. Загрузка продукта может оказаться невозможной. Пожалуйста, установите необходимые права на корневую папку вашего сайта или обратитесь к администраторам вашего хостинга.";
-	$MESS["LOADER_EXISTS_ERR"] = "";
-	$MESS["LOADER_IS_DISTR"] = "На сайте найдены загруженые дистрибутивы. Нажмите на название любого из дистрибутивов для его распаковки:";
-	$MESS["LOADER_OVERWRITE"] = "<b>Внимание!</b> Существующие на сайте файлы могут быть перезаписаны файлами из дистрибутива.";
-	$MESS["LOADER_IS_DISTR_PART"] = "На сайте найдены недогруженные дистрибутивы. Нажмите на название любого из недогруженных дистрибутивов для полной загрузки:";
-	$MESS["LOADER_NEW_LOAD_TITLE"] = "Загрузка дистрибутива с сайта <a href=\"https://www.1c-bitrix.ru\" target=\"_blank\">https://www.1c-bitrix.ru</a>";
-	$MESS["LOADER_NEW_ED"] = "Выбор дистрибутива";
-	$MESS["LOADER_NEW_VERSION"] = "Доступна новая версия скрипта установки, но загрузить её не удалось";
-	$MESS["LOADER_NEW_AUTO"] = "Автоматически запустить распаковку после загрузки";
-	$MESS["LOADER_NEW_STEPS"] = "Загружать по шагам с шагом";
-	$MESS["LOADER_NEW_STEPS0"] = "неограниченно долгим";
-	$MESS["LOADER_NEW_STEPS30"] = "не более 30 секунд";
-	$MESS["LOADER_NEW_STEPS60"] = "не более 60 секунд";
-	$MESS["LOADER_NEW_STEPS120"] = "не более 120 секунд";
-	$MESS["LOADER_NEW_STEPS180"] = "не более 180 секунд";
-	$MESS["LOADER_NEW_STEPS240"] = "не более 240 секунд";
-	$MESS["LOADER_NEW_LOAD"] = "Загрузить";
-	$MESS["LOADER_DESCR"] = "Этот скрипт предназначен для загрузки дистрибутивов \"1С-Битрикс\" с сайта <a href=\"https://www.1c-bitrix.ru/download/index.php\" target=\"_blank\">www.1c-bitrix.ru</a> непосредственно на ваш сайт, а так же для распаковки дистрибутива на вашем сайте.<br><br> Загрузите этот скрипт в корневую папку вашего сайта и откройте его в браузере (введите в адресной строке браузера <nobr>http://&lt;ваш сайт&gt;/".$this_script_name."</nobr>).";
-	$MESS["LOADER_BACK_2LIST"] = "Вернуться в список дистрибутивов";
-	$MESS["LOADER_BACK"] = "Назад";
-	$MESS["LOADER_LOG_ERRORS"] = "Произошли следующие ошибки:";
-	$MESS["LOADER_NO_LOG"] = "Log-файл не найден";
-	$MESS["LOADER_BOTTOM_NOTE1"] = "<b><font color=\"#FF0000\">Внимание!</font></b> По окончании установки продукта <b>обязательно</b> удалите скрипт <nobr>/".$this_script_name."</nobr> с вашего сайта. Доступ постороннего человека к этому скрипту может повлечь за собой нарушение работы вашего сайта.";
-	$MESS["LOADER_KB"] = "кб";
-	$MESS["LOADER_LOAD_QUERY_SERVER"] = "Запрашиваю сервер...";
-	$MESS["LOADER_LOAD_QUERY_DISTR"] = "Запрашиваю дистрибутив #DISTR#";
-	$MESS["LOADER_LOAD_CONN2HOST"] = "Открываю соединение к #HOST#...";
-	$MESS["LOADER_LOAD_NO_CONN2HOST"] = "Не могу соединиться с #HOST#:";
-	$MESS["LOADER_LOAD_QUERY_FILE"] = "Запрашиваю файл...";
-	$MESS["LOADER_LOAD_WAIT"] = "Ожидаю ответ...";
-	$MESS["LOADER_LOAD_SERVER_ANSWER"] = "Ошибка загрузки. Ответа сервера:<br><br> #ANS#";
-	$MESS["LOADER_LOAD_SERVER_ANSWER1"] = "Ответ сервера: 403 Доступ запрещён.<br>Проверьте правильность ввода ключа.";
-	$MESS["LOADER_LOAD_NEED_RELOAD"] = "Докачка дистрибутива невозможна. Начинаю качать заново.";
-	$MESS["LOADER_LOAD_NO_WRITE2FILE"] = "Не могу открыть файл #FILE# на запись";
-	$MESS["LOADER_LOAD_LOAD_DISTR"] = "Загружаю дистрибутив #DISTR#";
-	$MESS["LOADER_LOAD_ERR_SIZE"] = "Ошибка размера файла";
-	$MESS["LOADER_LOAD_ERR_RENAME"] = "Не могу переименовать файл #FILE1# в файл #FILE2#";
-	$MESS["LOADER_LOAD_CANT_OPEN_WRITE"] = "Не могу открыть файл #FILE# на запись";
-	$MESS["LOADER_LOAD_CANT_OPEN_READ"] = "Не могу открыть файл #FILE# на чтение";
-	$MESS["LOADER_LOAD_LOADING"] = "Загружаю файл... дождитесь окончания загрузки...";
-	$MESS["LOADER_LOAD_FILE_SAVED"] = "Файл сохранен: #FILE# [#SIZE# байт]";
-	$MESS["LOADER_UNPACK_ACTION"] = "Распаковываю дистрибутив... дождитесь окончания распаковки...";
-	$MESS["LOADER_UNPACK_UNKNOWN"] = "Неизвестная ошибка. Повторите процесс еще раз или обратитесь в службу технической поддержки";
-	$MESS["LOADER_UNPACK_DELETE"] = "Ошибка удаления временных файлов. Удалите файлы вручную.";
-	$MESS["LOADER_UNPACK_SUCCESS"] = "Дистрибутив успешно распакован";
-	$MESS["LOADER_UNPACK_ERRORS"] = "Дистрибутив распакован с ошибками";
-	$MESS["LOADER_KEY_DEMO"] = "Демонстрационная версия";
-	$MESS["LOADER_KEY_COMM"] = "Коммерческая версия";
-	$MESS["LOADER_KEY_TITLE"] = "Введите лицензионный ключ";
-	$MESS["LOADER_NOT_EMPTY"] = "В текущей папке уже есть установленная версия продукта, установка новой версии возможна только в чистую корневую папку веб-сервера.";
+	$MESS = [
+		"NO_PERMS" => "Нет прав на запись в файл ",
+		"LOADER_LICENSE_KEY" => "Лицензионный ключ",
+		"INTRANET" => "Корпоративный портал",
+		"LOADER_TITLE" => "Загрузка продуктов \"1С-Битрикс\"",
+		"UPDATE_SUCCESS" => "Обновлено успешно. <a href='?'>Открыть</a>.",
+		"LOADER_NEW_STEPS" => "Загрузка продуктов \"1С-Битрикс\"",
+		"LOADER_SUBTITLE1" => "Загрузка продукта",
+		"LOADER_SUBTITLE2" => "1С-Битрикс",
+		"LOADER_MENU_LIST" => "Выбор продукта",
+		"LOADER_MENU_LOAD" => "Загрузка дистрибутива с сервера",
+		"LOADER_MENU_UNPACK" => "Распаковка дистрибутива",
+		"LOADER_TECHSUPPORT" => "",
+		"LOADER_TITLE_LIST" => "Выбор дистрибутива",
+		"LOADER_TITLE_LOAD" => "Загрузка дистрибутива на сайт",
+		"LOADER_TITLE_UNPACK" => "Распаковка дистрибутива",
+		"LOADER_TITLE_LOG" => "Отчет по загрузке",
+		"LOADER_SAFE_MODE_ERR" => "<font color=\"#FF0000\"><b>Внимание!</b></font> PHP на вашем сайте работает в Safe Mode. Установка продукта в автоматическом режиме невозможна. Пожалуйста, обратитесь в службу технической поддержки для получения дополнительной информации.",
+		"LOADER_NO_PERMS_ERR" => "<font color=\"#FF0000\"><b>Внимание!</b></font> PHP не имеет прав на запись в корневую папку #DIR# вашего сайта. Загрузка продукта может оказаться невозможной. Пожалуйста, установите необходимые права на корневую папку вашего сайта или обратитесь к администраторам вашего хостинга.",
+		"LOADER_EXISTS_ERR" => "",
+		"LOADER_IS_DISTR" => "На сайте найдены загруженые дистрибутивы. Нажмите на название любого из дистрибутивов для его распаковки:",
+		"LOADER_OVERWRITE" => "<b>Внимание!</b> Существующие на сайте файлы могут быть перезаписаны файлами из дистрибутива.",
+		"LOADER_IS_DISTR_PART" => "На сайте найдены недогруженные дистрибутивы. Нажмите на название любого из недогруженных дистрибутивов для полной загрузки:",
+		"LOADER_NEW_LOAD_TITLE" => "Загрузка дистрибутива с сайта <a href=\"https://www.1c-bitrix.ru\" target=\"_blank\">https://www.1c-bitrix.ru</a>",
+		"LOADER_NEW_ED" => "Выбор дистрибутива",
+		"LOADER_NEW_VERSION" => "Доступна новая версия скрипта установки, но загрузить её не удалось",
+		"LOADER_NEW_AUTO" => "Автоматически запустить распаковку после загрузки",
+		"LOADER_NEW_STEPS" => "Загружать по шагам с шагом",
+		"LOADER_NEW_STEPS0" => "неограниченно долгим",
+		"LOADER_NEW_STEPS30" => "не более 30 секунд",
+		"LOADER_NEW_STEPS60" => "не более 60 секунд",
+		"LOADER_NEW_STEPS120" => "не более 120 секунд",
+		"LOADER_NEW_STEPS180" => "не более 180 секунд",
+		"LOADER_NEW_STEPS240" => "не более 240 секунд",
+		"LOADER_NEW_LOAD" => "Загрузить",
+		"LOADER_DESCR" => "Этот скрипт предназначен для загрузки дистрибутивов \"1С-Битрикс\" с сайта <a href=\"https://www.1c-bitrix.ru/download/index.php\" target=\"_blank\">www.1c-bitrix.ru</a> непосредственно на ваш сайт, а так же для распаковки дистрибутива на вашем сайте.<br><br> Загрузите этот скрипт в корневую папку вашего сайта и откройте его в браузере (введите в адресной строке браузера <nobr>http://&lt,ваш сайт&gt,/".$this_script_name."</nobr>).",
+		"LOADER_BACK_2LIST" => "Вернуться в список дистрибутивов",
+		"LOADER_BACK" => "Назад",
+		"LOADER_LOG_ERRORS" => "Произошли следующие ошибки:",
+		"LOADER_NO_LOG" => "Log-файл не найден",
+		"LOADER_BOTTOM_NOTE1" => "<b><font color=\"#FF0000\">Внимание!</font></b> По окончании установки продукта <b>обязательно</b> удалите скрипт <nobr>/".$this_script_name."</nobr> с вашего сайта. Доступ постороннего человека к этому скрипту может повлечь за собой нарушение работы вашего сайта.",
+		"LOADER_KB" => "кб",
+		"LOADER_LOAD_QUERY_SERVER" => "Запрашиваю сервер...",
+		"LOADER_LOAD_QUERY_DISTR" => "Запрашиваю дистрибутив #DISTR#",
+		"LOADER_LOAD_CONN2HOST" => "Открываю соединение к #HOST#...",
+		"LOADER_LOAD_NO_CONN2HOST" => "Не могу соединиться с #HOST#:",
+		"LOADER_LOAD_QUERY_FILE" => "Запрашиваю файл...",
+		"LOADER_LOAD_WAIT" => "Ожидаю ответ...",
+		"LOADER_LOAD_SERVER_ANSWER" => "Ошибка загрузки. Ответа сервера:<br><br> #ANS#",
+		"LOADER_LOAD_SERVER_ANSWER1" => "Ответ сервера: 403 Доступ запрещён.<br>Проверьте правильность ввода ключа.",
+		"LOADER_LOAD_NEED_RELOAD" => "Докачка дистрибутива невозможна. Начинаю качать заново.",
+		"LOADER_LOAD_NO_WRITE2FILE" => "Не могу открыть файл #FILE# на запись",
+		"LOADER_LOAD_LOAD_DISTR" => "Загружаю дистрибутив #DISTR#",
+		"LOADER_LOAD_ERR_SIZE" => "Ошибка размера файла",
+		"LOADER_LOAD_ERR_RENAME" => "Не могу переименовать файл #FILE1# в файл #FILE2#",
+		"LOADER_LOAD_CANT_OPEN_WRITE" => "Не могу открыть файл #FILE# на запись",
+		"LOADER_LOAD_CANT_OPEN_READ" => "Не могу открыть файл #FILE# на чтение",
+		"LOADER_LOAD_LOADING" => "Загружаю файл... дождитесь окончания загрузки...",
+		"LOADER_LOAD_FILE_SAVED" => "Файл сохранен: #FILE# [#SIZE# байт]",
+		"LOADER_UNPACK_ACTION" => "Распаковываю дистрибутив... дождитесь окончания распаковки...",
+		"LOADER_UNPACK_UNKNOWN" => "Неизвестная ошибка. Повторите процесс еще раз или обратитесь в службу технической поддержки",
+		"LOADER_UNPACK_DELETE" => "Ошибка удаления временных файлов. Удалите файлы вручную.",
+		"LOADER_UNPACK_SUCCESS" => "Дистрибутив успешно распакован",
+		"LOADER_UNPACK_ERRORS" => "Дистрибутив распакован с ошибками",
+		"LOADER_KEY_DEMO" => "Демонстрационная версия",
+		"LOADER_KEY_COMM" => "Коммерческая версия",
+		"LOADER_KEY_TITLE" => "Введите лицензионный ключ",
+		"LOADER_NOT_EMPTY" => "В текущей папке уже есть установленная версия продукта, установка новой версии возможна только в чистую корневую папку веб-сервера.",
+	];
 }
 elseif (LANG == "de")
 {
-	$MESS["NO_PERMS"] = "Nicht genunugend Rechte um die Datei zu beschreiben";
-	$MESS["LOADER_LICENSE_KEY"] = "Lizenzschlussel";
-	$MESS["INTRANET"] = "Intranet Portal ";
-	$MESS["LOADER_TITLE"] = "Download der \"Bitrix\" Software";
-	$MESS["UPDATE_SUCCESS"] = "Aktualisierung erfolgreich durchgefuhrt. <a href='?'>Offnen?</a>.";
-	$MESS["LOADER_NEW_STEPS"] = "Download der \"Bitrix\" Software";
-	$MESS["LOADER_SUBTITLE1"] = "Softwaredownload";
-	$MESS["LOADER_SUBTITLE2"] = "Bitrix ";
-	$MESS["LOADER_MENU_LIST"] = "Auswahl des Installationspacks";
-	$MESS["LOADER_MENU_LOAD"] = "Download des Installationspacks von dem Server";
-	$MESS["LOADER_MENU_UNPACK"] = "Auspacken des Installationspacks";
-	$MESS["LOADER_TECHSUPPORT"] = "";
-	$MESS["LOADER_TITLE_LIST"] = "Auswahl des Installationspacks";
-	$MESS["LOADER_TITLE_LOAD"] = "Upload des Installationspacks auf die Website";
-	$MESS["LOADER_TITLE_UNPACK"] = "Auspacken des Installationspacks";
-	$MESS["LOADER_TITLE_LOG"] = "Uploadbericht";
-	$MESS["LOADER_SAFE_MODE_ERR"] = "<font color=\"#FF0000\"><b>Achtung!</b></font> PHP auf Ihrer Website arbeitet im Safe Mode. Die automatische Installation der Software ist nicht moglich. Bitte wenden Sie sich fur weitere Informationen an den technischen Support.";
-	$MESS["LOADER_NO_PERMS_ERR"] = "<font
-color=\"#FF0000\"><b>Achtung!</b></font> PHP hat nicht genugend Rechte um das Hautverzeichnis #DIR# Ihrer Website zu uberschreiben. Es konnen Fehler bei der Installation auftreten. Bitte stellen Sie alle erforderlichen Rechte ein, oder wenden Sie sich an Ihren Hosting-Anbieter.";
-	$MESS["LOADER_EXISTS_ERR"] = "";
-	$MESS["LOADER_IS_DISTR"] = "Hochgeladene Installationspacks wurden gefunden. Klicken Sie auf den Namen des erforderlichen Installationspacks um mit dem Auspacken zu beginnen:";
-	$MESS["LOADER_OVERWRITE"] = "<b>Achtung!</b> Die existierenden Dateien konnen durch die Dateien aus dem Installationspack uberschrieben werden.";
-	$MESS["LOADER_IS_DISTR_PART"] = "Auf der Website wurden nicht vollstandig geladenen Installationspacks hochgeladen. Klicken Sie auf den Namen des erforderlichen Installationspacks um mit Upload fortzufuhren:";
-	$MESS["LOADER_NEW_LOAD_TITLE"] = "Download des Installationspacks von der Site <a href=\"https://www.bitrix.de\" target=\"_blank\">https://www.bitrix.de</a>";
-	$MESS["LOADER_NEW_ED"] = "Auswahl des Installationspacks";
-	$MESS["LOADER_NEW_VERSION"] = "Neue Version des Installationsskripts ins verfugbar!";
-	$MESS["LOADER_NEW_AUTO"] = "Auspacken automatisch nach dem Upload starten";
-	$MESS["LOADER_NEW_STEPS"] = "Hochladen in folgenden Schritten";
-	$MESS["LOADER_NEW_STEPS0"] = "uneingeschrankt ";
-	$MESS["LOADER_NEW_STEPS30"] = "max. 30 Sekunden";
-	$MESS["LOADER_NEW_STEPS60"] = " max. 60 Sekunden";
-	$MESS["LOADER_NEW_STEPS120"] = "max. 120 Sekunden";
-	$MESS["LOADER_NEW_STEPS180"] = "max. 180 Sekunden";
-	$MESS["LOADER_NEW_STEPS240"] = "max. 240 Sekunden";
-	$MESS["LOADER_NEW_LOAD"] = "Hochladen";
-	$MESS["LOADER_DESCR"] = "Dieses Skript ist dient dem Download der \"Bitrix\"-Installationspacks von der Website <a
-href=\"https://www.bitrix.de/download/index.php\" target=\"_blank\">www.bitrix.de</a> direkt auf Ihre Website, sowie dem Auspacken des Installationspacks auf Ihrer Website.<br><br> 
-Laden Sie dieses Skript in das Hauptverzeichnis, und offnen Sie es in Ihrem Internet-Browser. Geben Sie dafur in der Adresszeile <nobr>https://&amp;lt;IhreWebsite&amp;gt;/".$this_script_name."</nobr>).";
-	$MESS["LOADER_BACK_2LIST"] = "Zur der Installationspack-Liste zuruckkehren";
-	$MESS["LOADER_BACK"] = "Zuruck";
-	$MESS["LOADER_LOG_ERRORS"] = "Folgende Fehler sind aufgetreten:";
-	$MESS["LOADER_NO_LOG"] = "Log-Datei nicht gefunden";
-	$MESS["LOADER_BOTTOM_NOTE1"] = "<b><font color=\"#FF0000\">Achtung!</font></b> Nach der Installation des Produkts loschen Sie <b>unbedingt</b> das Skript<nobr>/".$this_script_name."</nobr> von Ihrer Website. Der Fremdzugriff zu diesem Skript kann fehlerhafte Funktion Ihrer Website mit sich fuhren.";
-	$MESS["LOADER_KB"] = "кб";
-	$MESS["LOADER_LOAD_QUERY_SERVER"] = "Anfrage an den Server...";
-	$MESS["LOADER_LOAD_QUERY_DISTR"] = "Anfrage fur das Installationspack #DISTR#";
-	$MESS["LOADER_LOAD_CONN2HOST"] = "Aufbau der Verbindung mit #HOST#...";
-	$MESS["LOADER_LOAD_NO_CONN2HOST"] = "Keine Verbindung mit #HOST#:";
-	$MESS["LOADER_LOAD_QUERY_FILE"] = "Anfrage fur die Datei...";
-	$MESS["LOADER_LOAD_WAIT"] = "Abwarten der Ruckmeldung...";
-	$MESS["LOADER_LOAD_SERVER_ANSWER"] = "Upload-Fehler. Serverruckmeldung:<br><br> #ANS#";
-	$MESS["LOADER_LOAD_SERVER_ANSWER1"] = " Serverruckmeldung: 403 Zugriff verweigert.<br>Uberprufen Sie die Richtigkeit des Codes.";
-	$MESS["LOADER_LOAD_NEED_RELOAD"] = "Fortfuhrung des Downloadvorgangs nicht moglich. Der Downloadvorgang wird erneut ausgefuhrt.";
-	$MESS["LOADER_LOAD_NO_WRITE2FILE"] = "Die #FILE# kann nicht bearbeitet werden";
-	$MESS["LOADER_LOAD_LOAD_DISTR"] = "Installationspack #DISTR# wird hochgeladen";
-	$MESS["LOADER_LOAD_ERR_SIZE"] = "Fehler bei der Dateigro?e";
-	$MESS["LOADER_LOAD_ERR_RENAME"] = "Die Datei #FILE1# kann nicht in #FILE2# umbenannt warden";
-	$MESS["LOADER_LOAD_CANT_OPEN_WRITE"] = "Die Datei #FILE# kann nicht bearbeitet werden";
-	$MESS["LOADER_LOAD_CANT_OPEN_READ"] = "Die Datei #FILE# kann nicht gelesen werden";
-	$MESS["LOADER_LOAD_LOADING"] = "Upload-Vorgang lauft... Bitte warten Sie bis der Vorgang beendet wird.";
-	$MESS["LOADER_LOAD_FILE_SAVED"] = "Datei gespeichert: #FILE# [#SIZE# Byte]";
-	$MESS["LOADER_UNPACK_ACTION"] = " Das Installationspack wird ausgepackt... Bitte warten Sie bis der Vorgang beendet wird.";
-	$MESS["LOADER_UNPACK_UNKNOWN"] = "Unbekannter Fehler. Fuhren Sie den Vorgang nochmal aus, oder wenden Sie sich an den technischen Support";
-	$MESS["LOADER_UNPACK_DELETE"] = "Fehler beim Loschen der temporaren Dateien. Loschen Sie bitte die Dateien manuell.";
-	$MESS["LOADER_UNPACK_SUCCESS"] = "Das Installationspack wurde erfolgreich ausgepackt";
-	$MESS["LOADER_UNPACK_ERRORS"] = " Das Installationspack wurde mit Fehlern ausgepackt ";
-	$MESS["LOADER_KEY_DEMO"] = "Testversion";
-	$MESS["LOADER_KEY_COMM"] = "Vollversion";
-	$MESS["LOADER_KEY_TITLE"] = "Lizenzcode eingeben";
-	$MESS["LOADER_NOT_EMPTY"] = "Es existiert bereits eine Produktversion im aktuellen Ordner. Eine neue Version kann nur in einem leeren Root-Verzeichnis des Webservers installiert werden.";
+	$MESS =	[
+		"NO_PERMS" => "Nicht genunugend Rechte um die Datei zu beschreiben",
+		"LOADER_LICENSE_KEY" => "Lizenzschlussel",
+		"INTRANET" => "Intranet Portal ",
+		"LOADER_TITLE" => "Download der \"Bitrix24\" Software",
+		"UPDATE_SUCCESS" => "Aktualisierung erfolgreich durchgefuhrt. <a href='?'>Offnen?</a>.",
+		"LOADER_NEW_STEPS" => "Download der \"Bitrix24\" Software",
+		"LOADER_SUBTITLE1" => "Softwaredownload",
+		"LOADER_SUBTITLE2" => "Bitrix24",
+		"LOADER_MENU_LIST" => "Auswahl des Installationspacks",
+		"LOADER_MENU_LOAD" => "Download des Installationspacks von dem Server",
+		"LOADER_MENU_UNPACK" => "Auspacken des Installationspacks",
+		"LOADER_TECHSUPPORT" => "",
+		"LOADER_TITLE_LIST" => "Auswahl des Installationspacks",
+		"LOADER_TITLE_LOAD" => "Upload des Installationspacks auf die Website",
+		"LOADER_TITLE_UNPACK" => "Auspacken des Installationspacks",
+		"LOADER_TITLE_LOG" => "Uploadbericht",
+		"LOADER_SAFE_MODE_ERR" => "<font color=\"#FF0000\"><b>Achtung!</b></font> PHP auf Ihrer Website arbeitet im Safe Mode. Die automatische Installation der Software ist nicht moglich. Bitte wenden Sie sich fur weitere Informationen an den technischen Support.",
+		"LOADER_NO_PERMS_ERR" => "<font
+color=\"#FF0000\"><b>Achtung!</b></font> PHP hat nicht genugend Rechte um das Hautverzeichnis #DIR# Ihrer Website zu uberschreiben. Es konnen Fehler bei der Installation auftreten. Bitte stellen Sie alle erforderlichen Rechte ein, oder wenden Sie sich an Ihren Hosting-Anbieter.",
+		"LOADER_EXISTS_ERR" => "",
+		"LOADER_IS_DISTR" => "Hochgeladene Installationspacks wurden gefunden. Klicken Sie auf den Namen des erforderlichen Installationspacks um mit dem Auspacken zu beginnen:",
+		"LOADER_OVERWRITE" => "<b>Achtung!</b> Die existierenden Dateien konnen durch die Dateien aus dem Installationspack uberschrieben werden.",
+		"LOADER_IS_DISTR_PART" => "Auf der Website wurden nicht vollstandig geladenen Installationspacks hochgeladen. Klicken Sie auf den Namen des erforderlichen Installationspacks um mit Upload fortzufuhren:",
+		"LOADER_NEW_LOAD_TITLE" => "Download des Installationspacks von der Site <a href=\"https://www.bitrix.de\" target=\"_blank\">https://www.bitrix.de</a>",
+		"LOADER_NEW_ED" => "Auswahl des Installationspacks",
+		"LOADER_NEW_VERSION" => "Neue Version des Installationsskripts ins verfugbar!",
+		"LOADER_NEW_AUTO" => "Auspacken automatisch nach dem Upload starten",
+		"LOADER_NEW_STEPS" => "Hochladen in folgenden Schritten",
+		"LOADER_NEW_STEPS0" => "uneingeschrankt ",
+		"LOADER_NEW_STEPS30" => "max. 30 Sekunden",
+		"LOADER_NEW_STEPS60" => " max. 60 Sekunden",
+		"LOADER_NEW_STEPS120" => "max. 120 Sekunden",
+		"LOADER_NEW_STEPS180" => "max. 180 Sekunden",
+		"LOADER_NEW_STEPS240" => "max. 240 Sekunden",
+		"LOADER_NEW_LOAD" => "Hochladen",
+		"LOADER_DESCR" => "Dieses Skript ist dient dem Download der \"Bitrix24\"-Installationspacks von der Website <a
+href=\"https://www.bitrix24.de/prices/self-hosted.php\" target=\"_blank\">www.bitrix24.de</a> direkt auf Ihre Website, sowie dem Auspacken des Installationspacks auf Ihrer Website.<br><br> 
+Laden Sie dieses Skript in das Hauptverzeichnis, und offnen Sie es in Ihrem Internet-Browser. Geben Sie dafur in der Adresszeile <nobr>https://&amp;lt;IhreWebsite&amp;gt;/".$this_script_name."</nobr>).",
+		"LOADER_BACK_2LIST" => "Zur der Installationspack-Liste zuruckkehren",
+		"LOADER_BACK" => "Zurück",
+		"LOADER_LOG_ERRORS" => "Folgende Fehler sind aufgetreten:",
+		"LOADER_NO_LOG" => "Log-Datei nicht gefunden",
+		"LOADER_BOTTOM_NOTE1" => "<b><font color=\"#FF0000\">Achtung!</font></b> Nach der Installation des Produkts loschen Sie <b>unbedingt</b> das Skript<nobr>/".$this_script_name."</nobr> von Ihrer Website. Der Fremdzugriff zu diesem Skript kann fehlerhafte Funktion Ihrer Website mit sich fuhren.",
+		"LOADER_KB" => "kb",
+		"LOADER_LOAD_QUERY_SERVER" => "Anfrage an den Server...",
+		"LOADER_LOAD_QUERY_DISTR" => "Anfrage fur das Installationspack #DISTR#",
+		"LOADER_LOAD_CONN2HOST" => "Aufbau der Verbindung mit #HOST#...",
+		"LOADER_LOAD_NO_CONN2HOST" => "Keine Verbindung mit #HOST#:",
+		"LOADER_LOAD_QUERY_FILE" => "Anfrage fur die Datei...",
+		"LOADER_LOAD_WAIT" => "Abwarten der Ruckmeldung...",
+		"LOADER_LOAD_SERVER_ANSWER" => "Upload-Fehler. Serverruckmeldung:<br><br> #ANS#",
+		"LOADER_LOAD_SERVER_ANSWER1" => " Serverruckmeldung: 403 Zugriff verweigert.<br>Uberprufen Sie die Richtigkeit des Codes.",
+		"LOADER_LOAD_NEED_RELOAD" => "Fortfuhrung des Downloadvorgangs nicht moglich. Der Downloadvorgang wird erneut ausgefuhrt.",
+		"LOADER_LOAD_NO_WRITE2FILE" => "Die #FILE# kann nicht bearbeitet werden",
+		"LOADER_LOAD_LOAD_DISTR" => "Installationspack #DISTR# wird hochgeladen",
+		"LOADER_LOAD_ERR_SIZE" => "Fehler bei der Dateigro?e",
+		"LOADER_LOAD_ERR_RENAME" => "Die Datei #FILE1# kann nicht in #FILE2# umbenannt warden",
+		"LOADER_LOAD_CANT_OPEN_WRITE" => "Die Datei #FILE# kann nicht bearbeitet werden",
+		"LOADER_LOAD_CANT_OPEN_READ" => "Die Datei #FILE# kann nicht gelesen werden",
+		"LOADER_LOAD_LOADING" => "Upload-Vorgang lauft... Bitte warten Sie bis der Vorgang beendet wird.",
+		"LOADER_LOAD_FILE_SAVED" => "Datei gespeichert: #FILE# [#SIZE# Byte]",
+		"LOADER_UNPACK_ACTION" => " Das Installationspack wird ausgepackt... Bitte warten Sie bis der Vorgang beendet wird.",
+		"LOADER_UNPACK_UNKNOWN" => "Unbekannter Fehler. Fuhren Sie den Vorgang nochmal aus, oder wenden Sie sich an den technischen Support",
+		"LOADER_UNPACK_DELETE" => "Fehler beim Loschen der temporaren Dateien. Loschen Sie bitte die Dateien manuell.",
+		"LOADER_UNPACK_SUCCESS" => "Das Installationspack wurde erfolgreich ausgepackt",
+		"LOADER_UNPACK_ERRORS" => " Das Installationspack wurde mit Fehlern ausgepackt ",
+		"LOADER_KEY_DEMO" => "Testversion",
+		"LOADER_KEY_COMM" => "Vollversion",
+		"LOADER_KEY_TITLE" => "Lizenzcode eingeben",
+		"LOADER_NOT_EMPTY" => "Es existiert bereits eine Produktversion im aktuellen Ordner. Eine neue Version kann nur in einem leeren Root-Verzeichnis des Webservers installiert werden.",
+	];
 }
 else
 {
-	$MESS["NO_PERMS"] = "No permissions to write the file ";
-	$MESS["LOADER_LICENSE_KEY"] = "Your license key";
-	$MESS["INTRANET"] = "Bitrix Intranet Portal";
-	$MESS["LOADER_TITLE"] = "Loading Product \"Bitrix Site Manager\" or \"Bitrix Intranet Portal\"";
-	$MESS["UPDATE_SUCCESS"] = "Successful update. <a href='?'>Open</a>.";
-	$MESS["LOADER_SUBTITLE1"] = "Loading";
-	$MESS["LOADER_SUBTITLE2"] = "Bitrix Site Manager or Bitrix Intranet Portal";
-	$MESS["LOADER_MENU_LIST"] = "Choose a package";
-	$MESS["LOADER_MENU_LOAD"] = "Download installation package from server";
-	$MESS["LOADER_MENU_UNPACK"] = "Unpacking the Installation Package";
-	$MESS["LOADER_TECHSUPPORT"] = "";
-	$MESS["LOADER_TITLE_LIST"] = "Select installation package";
-	$MESS["LOADER_TITLE_LOAD"] = "Uploading installation package to the site";
-	$MESS["LOADER_TITLE_UNPACK"] = "Unpacking the Installation Package";
-	$MESS["LOADER_TITLE_LOG"] = "Upload report";
-	$MESS["LOADER_SAFE_MODE_ERR"] = "<font color=\"#FF0000\"><b>Attention!</b></font> Your PHP functions in Safe Mode. The Setup cannot proceed in automatic mode. Please consult the technical support service for additional instructions.";
-	$MESS["LOADER_NO_PERMS_ERR"] = "<font color=\"#FF0000\"><b>Attention!</b></font> PHP has not enough permissions to write to the root directory #DIR# of your site. Loading is likely to fail. Please set the required access permissions to the root directory of your site or consult administrators of your hosting service.";
-	$MESS["LOADER_EXISTS_ERR"] = "";
-	$MESS["LOADER_IS_DISTR"] = "Uploaded installation packages were found on the site. Click the name of any package to start installation:";
-	$MESS["LOADER_OVERWRITE"] = "<b>Attention!</b> Files currently present on your site will possibly be overwritten with files from the package.";
-	$MESS["LOADER_IS_DISTR_PART"] = "Incompletely uploaded installation packages were found on the site. Click the name of any package to finish loading:";
-	$MESS["LOADER_NEW_LOAD_TITLE"] = "Download new installation package from <a href=\"https://www.bitrix24.com\" target=\"_blank\">https://www.bitrix24.com</a>";
-	$MESS["LOADER_NEW_VERSION"] = "New version of bitrixsetup script is available!";
-	$MESS["LOADER_NEW_ED"] = "Choose a package";
-	$MESS["LOADER_NEW_AUTO"] = "automatically start unpacking after loading";
-	$MESS["LOADER_NEW_STEPS"] = "load gradually with interval:";
-	$MESS["LOADER_NEW_STEPS0"] = "unlimited";
-	$MESS["LOADER_NEW_STEPS30"] = "less than 30 seconds";
-	$MESS["LOADER_NEW_STEPS60"] = "less than 60 seconds";
-	$MESS["LOADER_NEW_STEPS120"] = "less than 120 seconds";
-	$MESS["LOADER_NEW_STEPS180"] = "less than 180 seconds";
-	$MESS["LOADER_NEW_STEPS240"] = "less than 240 seconds";
-	$MESS["LOADER_NEW_LOAD"] = "Download";
-	$MESS["LOADER_DESCR"] = "";
-	$MESS["LOADER_BACK_2LIST"] = "Back to packages list";
-	$MESS["LOADER_BACK"] = "Back";
-	$MESS["LOADER_LOG_ERRORS"] = "The following errors occured:";
-	$MESS["LOADER_NO_LOG"] = "Log file not found";
-	$MESS["LOADER_BOTTOM_NOTE1"] = "<b><font color=\"#FF0000\">Attention!</font></b> After you have finished installing, <b>please be sure</b> to delete the script <nobr>/".$this_script_name."</nobr> from your site. Otherwise, unauthorized persons may access this script and damage your site.";
-	$MESS["LOADER_KB"] = "kb";
-	$MESS["LOADER_LOAD_QUERY_SERVER"] = "Connecting server...";
-	$MESS["LOADER_LOAD_QUERY_DISTR"] = "Requesting package #DISTR#";
-	$MESS["LOADER_LOAD_CONN2HOST"] = "Establishing connection to #HOST#...";
-	$MESS["LOADER_LOAD_NO_CONN2HOST"] = "Cannot connect to #HOST#:";
-	$MESS["LOADER_LOAD_QUERY_FILE"] = "Requesting file...";
-	$MESS["LOADER_LOAD_WAIT"] = "Waiting for response...";
-	$MESS["LOADER_LOAD_SERVER_ANSWER"] = "Error while downloading. Server reply was: #ANS#";
-	$MESS["LOADER_LOAD_SERVER_ANSWER1"] = "Server reply: 403 Forbidden.<br>Please check your licence key.";
-	$MESS["LOADER_LOAD_NEED_RELOAD"] = "Cannot resume download. Starting new download.";
-	$MESS["LOADER_LOAD_NO_WRITE2FILE"] = "Cannot open file #FILE# for writing";
-	$MESS["LOADER_LOAD_LOAD_DISTR"] = "Downloading package #DISTR#";
-	$MESS["LOADER_LOAD_ERR_SIZE"] = "File size error";
-	$MESS["LOADER_LOAD_ERR_RENAME"] = "Cannot rename file #FILE1# to #FILE2#";
-	$MESS["LOADER_LOAD_CANT_OPEN_WRITE"] = "Cannot open file #FILE# for writing";
-	$MESS["LOADER_LOAD_CANT_OPEN_READ"] = "Cannot open file #FILE# for reading";
-	$MESS["LOADER_LOAD_LOADING"] = "Download in progress. Please wait...";
-	$MESS["LOADER_LOAD_FILE_SAVED"] = "File saved: #FILE# [#SIZE# bytes]";
-	$MESS["LOADER_UNPACK_ACTION"] = "Unpacking the package. Please wait...";
-	$MESS["LOADER_UNPACK_UNKNOWN"] = "Unknown error occured. Please try again or consult the technical support service";
-	$MESS["LOADER_UNPACK_DELETE"] = "Errors occured while deleting temporary files";
-	$MESS["LOADER_UNPACK_SUCCESS"] = "The installation package successfully unpacked";
-	$MESS["LOADER_UNPACK_ERRORS"] = "Errors occured while unpacking the installation package";
-	$MESS["LOADER_KEY_DEMO"] = "Demo version";
-	$MESS["LOADER_KEY_COMM"] = "Commercial version";
-	$MESS["LOADER_KEY_TITLE"] = "Specify license key";
-	$MESS["LOADER_NOT_EMPTY"] = "An instance of the system already exists in the current folder. New version can only be installed to an empty folder in the web server root.";
+	$MESS = [
+		"NO_PERMS" => "No permissions to write the file ",
+		"LOADER_LICENSE_KEY" => "Your license key",
+		"INTRANET" => "Bitrix Intranet Portal",
+		"LOADER_TITLE" => "Loading Product \"Bitrix24\"",
+		"UPDATE_SUCCESS" => "Successful update. <a href='?'>Open</a>.",
+		"LOADER_SUBTITLE1" => "Loading",
+		"LOADER_SUBTITLE2" => "Bitrix24",
+		"LOADER_MENU_LIST" => "Choose a package",
+		"LOADER_MENU_LOAD" => "Download installation package from server",
+		"LOADER_MENU_UNPACK" => "Unpacking the Installation Package",
+		"LOADER_TECHSUPPORT" => "",
+		"LOADER_TITLE_LIST" => "Select installation package",
+		"LOADER_TITLE_LOAD" => "Uploading installation package to the site",
+		"LOADER_TITLE_UNPACK" => "Unpacking the Installation Package",
+		"LOADER_TITLE_LOG" => "Upload report",
+		"LOADER_SAFE_MODE_ERR" => "<font color=\"#FF0000\"><b>Attention!</b></font> Your PHP functions in Safe Mode. The Setup cannot proceed in automatic mode. Please consult the technical support service for additional instructions.",
+		"LOADER_NO_PERMS_ERR" => "<font color=\"#FF0000\"><b>Attention!</b></font> PHP has not enough permissions to write to the root directory #DIR# of your site. Loading is likely to fail. Please set the required access permissions to the root directory of your site or consult administrators of your hosting service.",
+		"LOADER_EXISTS_ERR" => "",
+		"LOADER_IS_DISTR" => "Uploaded installation packages were found on the site. Click the name of any package to start installation:",
+		"LOADER_OVERWRITE" => "<b>Attention!</b> Files currently present on your site will possibly be overwritten with files from the package.",
+		"LOADER_IS_DISTR_PART" => "Incompletely uploaded installation packages were found on the site. Click the name of any package to finish loading:",
+		"LOADER_NEW_LOAD_TITLE" => "Download new installation package from <a href=\"https://www.bitrix24.com\" target=\"_blank\">https://www.bitrix24.com</a>",
+		"LOADER_NEW_VERSION" => "New version of bitrixsetup script is available!",
+		"LOADER_NEW_ED" => "Choose a package",
+		"LOADER_NEW_AUTO" => "automatically start unpacking after loading",
+		"LOADER_NEW_STEPS" => "load gradually with interval:",
+		"LOADER_NEW_STEPS0" => "unlimited",
+		"LOADER_NEW_STEPS30" => "less than 30 seconds",
+		"LOADER_NEW_STEPS60" => "less than 60 seconds",
+		"LOADER_NEW_STEPS120" => "less than 120 seconds",
+		"LOADER_NEW_STEPS180" => "less than 180 seconds",
+		"LOADER_NEW_STEPS240" => "less than 240 seconds",
+		"LOADER_NEW_LOAD" => "Download",
+		"LOADER_DESCR" => "",
+		"LOADER_BACK_2LIST" => "Back to packages list",
+		"LOADER_BACK" => "Back",
+		"LOADER_LOG_ERRORS" => "The following errors occured:",
+		"LOADER_NO_LOG" => "Log file not found",
+		"LOADER_BOTTOM_NOTE1" => "<b><font color=\"#FF0000\">Attention!</font></b> After you have finished installing, <b>please be sure</b> to delete the script <nobr>/".$this_script_name."</nobr> from your site. Otherwise, unauthorized persons may access this script and damage your site.",
+		"LOADER_KB" => "kb",
+		"LOADER_LOAD_QUERY_SERVER" => "Connecting server...",
+		"LOADER_LOAD_QUERY_DISTR" => "Requesting package #DISTR#",
+		"LOADER_LOAD_CONN2HOST" => "Establishing connection to #HOST#...",
+		"LOADER_LOAD_NO_CONN2HOST" => "Cannot connect to #HOST#:",
+		"LOADER_LOAD_QUERY_FILE" => "Requesting file...",
+		"LOADER_LOAD_WAIT" => "Waiting for response...",
+		"LOADER_LOAD_SERVER_ANSWER" => "Error while downloading. Server reply was: #ANS#",
+		"LOADER_LOAD_SERVER_ANSWER1" => "Server reply: 403 Forbidden.<br>Please check your licence key.",
+		"LOADER_LOAD_NEED_RELOAD" => "Cannot resume download. Starting new download.",
+		"LOADER_LOAD_NO_WRITE2FILE" => "Cannot open file #FILE# for writing",
+		"LOADER_LOAD_LOAD_DISTR" => "Downloading package #DISTR#",
+		"LOADER_LOAD_ERR_SIZE" => "File size error",
+		"LOADER_LOAD_ERR_RENAME" => "Cannot rename file #FILE1# to #FILE2#",
+		"LOADER_LOAD_CANT_OPEN_WRITE" => "Cannot open file #FILE# for writing",
+		"LOADER_LOAD_CANT_OPEN_READ" => "Cannot open file #FILE# for reading",
+		"LOADER_LOAD_LOADING" => "Download in progress. Please wait...",
+		"LOADER_LOAD_FILE_SAVED" => "File saved: #FILE# [#SIZE# bytes]",
+		"LOADER_UNPACK_ACTION" => "Unpacking the package. Please wait...",
+		"LOADER_UNPACK_UNKNOWN" => "Unknown error occured. Please try again or consult the technical support service",
+		"LOADER_UNPACK_DELETE" => "Errors occured while deleting temporary files",
+		"LOADER_UNPACK_SUCCESS" => "The installation package successfully unpacked",
+		"LOADER_UNPACK_ERRORS" => "Errors occured while unpacking the installation package",
+		"LOADER_KEY_DEMO" => "Demo version",
+		"LOADER_KEY_COMM" => "Commercial version",
+		"LOADER_KEY_TITLE" => "Specify license key",
+		"LOADER_NOT_EMPTY" => "An instance of the system already exists in the current folder. New version can only be installed to an empty folder in the web server root.",
+	];
 }
-####### /MESSAGES ########
 
 function LoaderGetMessage($name)
 {
@@ -363,16 +389,28 @@ function LoaderGetMessage($name)
 	return $MESS[$name];
 }
 
-$bx_host = 'www.1c-bitrix.ru';
+if (LANG == 'ru')
+{
+	$bx_host = 'www.1c-bitrix.ru';
+}
+elseif (LANG == 'de')
+{
+	$bx_host = 'www.bitrix.de';
+}
+else
+{
+	$bx_host = 'www.bitrixsoft.com';
+}
+
 $bx_url = '/download/files/scripts/'.$this_script_name;
-$form = '';
-
-
 $strError = '';
+
 if (!$strAction)
 {
 	if (!$debug && file_exists($_SERVER['DOCUMENT_ROOT'].'/bitrix/modules/main'))
+	{
 		die(ShowError(LoaderGetMessage('LOADER_NOT_EMPTY')));
+	}
 	$strAction = "LIST";
 
 	// Check for updates
@@ -381,7 +419,7 @@ if (!$strAction)
 		file_put_contents(UPDATE_FLAG, time());
 		$res = @fsockopen('ssl://'.$bx_host, 443, $errno, $errstr, 3);
 
-		if($res)
+		if ($res)
 		{
 			$strRequest = "HEAD ".$bx_url." HTTP/1.1\r\n";
 			$strRequest.= "Host: ".$bx_host."\r\n";
@@ -405,10 +443,14 @@ if (!$strAction)
 								die();
 							}
 							else
+							{
 								$strError = str_replace("#FILE#", $this_script_name, LoaderGetMessage("LOADER_LOAD_CANT_OPEN_WRITE"));
+							}
 						}
 						else
+						{
 							$strError = LoaderGetMessage('LOADER_NEW_VERSION');
+						}
 					}
 					break;
 				}
@@ -418,76 +460,97 @@ if (!$strAction)
 	}
 }
 
-if ($strAction=="UNPACK" && (!isset($_REQUEST["filename"]) || strlen($_REQUEST["filename"])<=0))
+if ($strAction == "UNPACK" && empty($_REQUEST["filename"]))
+{
 	$strAction = "LIST";
+}
 
-
+$ar = [];
+$form = '';
 $script = '';
-if ($strAction=="LIST")
+
+if ($strAction == "LIST")
 {
 	$txt = '';
 	if ($strError)
+	{
 		$txt = ShowError($strError);
+	}
 
-	/*************************************************/
 	if (ini_get("safe_mode") == "1")
+	{
 		$txt .= LoaderGetMessage("LOADER_SAFE_MODE_ERR") . '<br>';
+	}
 
 	if (!is_writable($_SERVER["DOCUMENT_ROOT"]))
+	{
 		$txt .= str_replace("#DIR#", $_SERVER["DOCUMENT_ROOT"], LoaderGetMessage("LOADER_NO_PERMS_ERR")) . '<br>';
+	}
 
-	if (file_exists($_SERVER["DOCUMENT_ROOT"]."/bitrix")
-		&& is_dir($_SERVER["DOCUMENT_ROOT"]."/bitrix"))
+	if (file_exists($_SERVER["DOCUMENT_ROOT"]."/bitrix") && is_dir($_SERVER["DOCUMENT_ROOT"]."/bitrix"))
+	{
 		$txt .= LoaderGetMessage("LOADER_EXISTS_ERR") . '<br>';
+	}
 
-	$arLocalDistribs = array();
-	$arLocalDistribs_tmp = array();
+	$arLocalDistribs = [];
+	$arLocalDistribs_tmp = [];
 
 	$handle = opendir($_SERVER["DOCUMENT_ROOT"]);
-	if ($_REQUEST['test'] && $handle)
+	if (isset($_REQUEST['test']) && $_REQUEST['test'] && $handle)
 	{
 		while (false !== ($ffile = readdir($handle)))
 		{
 			if (!is_file($_SERVER["DOCUMENT_ROOT"]."/".$ffile))
+			{
 				continue;
+			}
 
-			if (strtolower(substr($ffile, -7))==".tar.gz")
+			if (strtolower(substr($ffile, -7)) == ".tar.gz")
+			{
 				$arLocalDistribs[] = $ffile;
-			elseif (strtolower(substr($ffile, -11))==".tar.gz.tmp")
+			}
+			elseif (strtolower(substr($ffile, -11)) == ".tar.gz.tmp")
+			{
 				$arLocalDistribs_tmp[] = $ffile;
-			elseif (strtolower(substr($ffile, -11))==".tar.gz.log")
+			}
+			elseif (strtolower(substr($ffile, -11)) == ".tar.gz.log")
+			{
 				$arLocalDistribs_tmp[] = $ffile;
+			}
 		}
 		closedir($handle);
 	}
 
-	if (count($arLocalDistribs)>0)
+	if (!empty($arLocalDistribs))
 	{
 		$txt .= LoaderGetMessage("LOADER_IS_DISTR").'<br>';
-		for ($i = 0; $i < count($arLocalDistribs); $i++)
+		for ($i = 0, $n = count($arLocalDistribs); $i < $n; $i++)
+		{
 			$txt .= '<a href="'.$this_script_name.'?action=UNPACK&filename='.urlencode($arLocalDistribs[$i]).'&by_step=Y">'.$arLocalDistribs[$i].'</a><br><br>';
+		}
 		$txt .= LoaderGetMessage("LOADER_OVERWRITE") . '<br><br>';
 	}
 
-
-	if (count($arLocalDistribs_tmp)>0 && $_REQUEST['action']=='LIST')
+	if (!empty($arLocalDistribs_tmp) && isset($_REQUEST['action']) && $_REQUEST['action'] == 'LIST')
 	{
-		//		$txt .= '<br>'.LoaderGetMessage("LOADER_IS_DISTR_PART") . '<br>';
-		foreach($arLocalDistribs_tmp as $distr)
+		foreach ($arLocalDistribs_tmp as $distr)
+		{
 			@unlink($_SERVER['DOCUMENT_ROOT'].'/'.$distr);
-		//			$txt .= '<a href="'.$this_script_name.'?action=LOAD&url='.urlencode(substr($arLocalDistribs_tmp[$i], 0, strlen($arLocalDistribs_tmp[$i])-4)).'">'.$arLocalDistribs_tmp[$i].'</a><br>';
+		}
 	}
-
 
 	$txt .= '<script>
 		function show_select(k)
 		{
 			document.getElementById("download_button").disabled = false;
 	';
-	foreach($arEditions[LANG] as $k => $ED)
+
+	foreach ($arEditions[LANG] as $k => $ED)
+	{
 		$txt .= 'if (ob = document.getElementById("select_'.$k.'"))
 				ob.disabled = "disabled";
 			';
+	}
 	$txt .= '
 			if (ob = document.getElementById("select_" + k))
 				ob.disabled = "";
@@ -506,11 +569,15 @@ if ($strAction=="LIST")
 	foreach($arEditions[LANG] as $k => $ED)
 	{
 		if ($single)
+		{
 			$txt.=' 
 			<tr><td style="padding-left:10px;font-weight:bold"><input type=hidden name=edition value=0>'.$ED['NAME'].'</td>';
+		}
 		else
+		{
 			$txt.=' 
 			<tr><td style="padding-left:10px;width:46%;"><input name=edition type=radio value="'.$k.'" id="radio_'.$k.'" onclick="show_select('.$k.')"> <label for="radio_'.$k.'">'.$ED['NAME'].'</label></td>';
+		}
 
 		$txt .= '<td>';
 		if (is_array($ED['LIST']))
@@ -518,13 +585,14 @@ if ($strAction=="LIST")
 			$txt .= '
 				<select name="url" '.($single ? '' : 'disabled').' id="select_'.$k.'">';
 			foreach ($ED['LIST'] as $key => $value)
+			{
 				$txt .= '<option value="'.$key.'">'.$value.'</option>';
+			}
 			$txt .= '
 				</select>';
 		}
 		$txt .= '</td>';
 	}
-
 
 	$txt.='
 		<tr>
@@ -552,19 +620,19 @@ if ($strAction=="LIST")
 		'BOTTOM' => (file_exists($_SERVER['DOCUMENT_ROOT'].'/index.php')?'<input type="button" value="&nbsp;&nbsp;&nbsp;'.LoaderGetMessage("LOADER_BACK").'&nbsp;&nbsp;&nbsp;" onclick="document.location=\'/index.php?lang='.LANG.'\'">&nbsp;':'').
 			'<input type="submit" value="&nbsp;&nbsp;&nbsp;'.LoaderGetMessage("LOADER_NEW_LOAD").'&nbsp;&nbsp;&nbsp;" id="download_button" '.($single ? '' : 'disabled').'>'
 	);
-
-	/*************************************************/
 }
 elseif ($strAction=="LOAD")
 {
-	/*********************************************************************/
-
-	if(LANG == "ru")
+	if (LANG == "ru")
+	{
 		$site = "https://www.1c-bitrix.ru/";
+	}
 	else
+	{
 		$site = "https://www.bitrixsoft.com/";
+	}
 
-	if($_REQUEST['licence_type'] == 'src' || $_REQUEST['LICENSE_KEY'])
+	if (isset($_REQUEST['licence_type']) && $_REQUEST['licence_type'] == 'src' || isset($_REQUEST['LICENSE_KEY']) && $_REQUEST['LICENSE_KEY'])
 	{
 		$path = 'private/download/';
 		$suffix = '_source.tar.gz';
@@ -577,20 +645,34 @@ elseif ($strAction=="LOAD")
 		@unlink($_SERVER['DOCUMENT_ROOT'].'/bitrix/license_key.php');
 		$path = 'download/';
 
-		if ($edition == 2) // отраслевые
+		if ($edition == 2)
+		{
 			$suffix = '_encode_php5.tar.gz';
+		}
 		else
+		{
 			$suffix = '_encode.tar.gz';
+		}
 	}
 
 	$ED = $arEditions[LANG][$edition];
 	if (is_array($ED['LIST']))
+	{
 		$url = $_REQUEST['url'];
+	}
 	else
+	{
 		$url = $ED['LIST'];
+	}
 
-	if ($_REQUEST['LICENSE_KEY'] && false !== $p = strpos($url, '/'))
-		$url = substr($url,$p+1);
+	if (isset($_REQUEST['licence_type']) && $_REQUEST['licence_type'] == 'src' || isset($_REQUEST['LICENSE_KEY']) && $_REQUEST['LICENSE_KEY'])
+	{
+		// different path for src
+		if (($p = strpos($url, '/')) !== false)
+		{
+			$url = substr($url, $p + 1);
+		}
+	}
 
 	$strRequestedUrl = $site.$path.$url.$suffix;
 
@@ -601,21 +683,24 @@ elseif ($strAction=="LOAD")
 
 	$strLog = '';
 	$status = '';
-	if ($_REQUEST['start'])
+	if (isset($_REQUEST['start']) && $_REQUEST['start'])
 	{
 		$res = 2;
 		SetCurrentProgress(1,100);
 	}
 	else
 	{
-		$res = LoadFile($strRequestedUrl.($_REQUEST["LICENSE_KEY"] <> '' ? "?lp=".md5($_REQUEST["LICENSE_KEY"]) : ''), $strFilename, $iTimeOut);
+		$res = LoadFile($strRequestedUrl.(($_REQUEST["LICENSE_KEY"] ?? '') <> '' ? "?lp=".md5($_REQUEST["LICENSE_KEY"]) : ''), $strFilename, $iTimeOut);
 	}
+
 	if (!$res)
+	{
 		$txt = nl2br($strLog);
+	}
 	elseif ($res==2) // частичная закачка
 	{
 		$txt = $status;
-		$script = "<script>GoToPage(\"".$this_script_name."?action=LOAD&edition=".urlencode($edition)."&url=".urlencode($url)."&lang=".urlencode(LANG)."&LICENSE_KEY=".urlencode($_REQUEST["LICENSE_KEY"])."&action_next=".urlencode($_REQUEST["action_next"])."&xz=".rand(0, 32000)."\");</script>\n";
+		$script = "<script>GoToPage(\"".$this_script_name."?action=LOAD&edition=".urlencode($edition)."&url=".urlencode($url)."&lang=".urlencode(LANG)."&LICENSE_KEY=".urlencode($_REQUEST["LICENSE_KEY"] ?? '')."&action_next=".urlencode($_REQUEST["action_next"] ?? '')."&xz=".rand(0, 32000)."\");</script>\n";
 	}
 	else
 	{
@@ -630,38 +715,43 @@ elseif ($strAction=="LOAD")
 		'TEXT' => $txt,
 		'BOTTOM' => (file_exists($_SERVER['DOCUMENT_ROOT'].'/index.php') && $short ?'<input type="button" value="&nbsp;&nbsp;&nbsp;'.LoaderGetMessage("LOADER_BACK").'&nbsp;&nbsp;&nbsp;" onclick="document.location=\'/index.php?lang='.LANG.'\'">&nbsp;':'<input type="button" value="&nbsp;&nbsp;&nbsp;'.LoaderGetMessage("LOADER_BACK").'&nbsp;&nbsp;&nbsp;" onclick="document.location=\''.$this_script_name.'?action=LIST&lang='.LANG.'\'">')
 	);
-
-	/*********************************************************************/
 }
 elseif ($strAction=="UNPACK")
 {
-	/*********************************************************************/
-	//	$iNumDistrFiles = 8000;
-
 	SetCurrentStatus(LoaderGetMessage("LOADER_UNPACK_ACTION"));
-	$oArchiver = new CArchiver($_SERVER["DOCUMENT_ROOT"]."/".$_REQUEST["filename"], true);
+	$filename = normalizePath($_REQUEST["filename"]);
+	$oArchiver = new CArchiver($_SERVER["DOCUMENT_ROOT"]."/".$filename, true);
 	$tres = $oArchiver->extractFiles($_SERVER["DOCUMENT_ROOT"]);
 
-	SetCurrentProgress($oArchiver->iCurPos, $oArchiver->iArchSize, False);
+	SetCurrentProgress($oArchiver->iCurPos, $oArchiver->iArchSize);
+
+	/** @global $status */
 	$txt = $status;
+
 	if ($tres)
 	{
 		if (!$oArchiver->bFinish)
+		{
 			$script = "<script>GoToPage(\"".$this_script_name."?action=UNPACK&filename=".urlencode(basename($oArchiver->_strArchiveName))."&by_step=Y&lang=".urlencode(LANG)."&seek=".$oArchiver->iCurPos."\");</script>\n";
+		}
 		else // finish
 		{
-			$res = unlink($_SERVER["DOCUMENT_ROOT"]."/".$_REQUEST["filename"]) && unlink(__FILE__);
+			$res = unlink($_SERVER["DOCUMENT_ROOT"]."/".$filename) && unlink(__FILE__);
 			@unlink(UPDATE_FLAG);
-			@unlink($_SERVER["DOCUMENT_ROOT"]."/".$_REQUEST["filename"].'.log');
-			@unlink($_SERVER["DOCUMENT_ROOT"]."/".$_REQUEST["filename"].'.tmp');
+			@unlink($_SERVER["DOCUMENT_ROOT"]."/".$filename.'.log');
+			@unlink($_SERVER["DOCUMENT_ROOT"]."/".$filename.'.tmp');
 
 			@unlink($_SERVER['DOCUMENT_ROOT'].'/restore.php');
 			$strInstFile = "index.php";
 
 			if (!$res)
+			{
 				SetCurrentStatus(LoaderGetMessage("LOADER_UNPACK_DELETE"));
+			}
 			elseif (!file_exists($_SERVER["DOCUMENT_ROOT"]."/".$strInstFile))
+			{
 				SetCurrentStatus(LoaderGetMessage("LOADER_UNPACK_UNKNOWN"));
+			}
 			else
 			{
 				bx_accelerator_reset();
@@ -673,7 +763,7 @@ elseif ($strAction=="UNPACK")
 	else
 	{
 		SetCurrentStatus(LoaderGetMessage("LOADER_UNPACK_ERRORS"));
-		$arErrors = &$oArchiver->GetErrors();
+		$arErrors = $oArchiver->GetErrors();
 		if (count($arErrors)>0)
 		{
 			if ($ft = fopen($_SERVER["DOCUMENT_ROOT"]."/".$this_script_name.".log", "wb"))
@@ -682,7 +772,7 @@ elseif ($strAction=="UNPACK")
 				{
 					$str = "[".$value[0]."] ".$value[1]."\n";
 					fwrite($ft, $str);
-					$txt .= $str . '<br>';
+					$txt .= ShowError(htmlspecialchars($str));
 				}
 				fclose($ft);
 			}
@@ -696,8 +786,6 @@ elseif ($strAction=="UNPACK")
 		'TEXT' => $txt,
 		'BOTTOM' => '<input type="button" value="&nbsp;&nbsp;&nbsp;'.LoaderGetMessage("LOADER_BACK").'&nbsp;&nbsp;&nbsp;" onclick="document.location=\''.$this_script_name.'?action=LIST\'">'
 	);
-
-	/*********************************************************************/
 }
 
 ########### HTML #########
@@ -705,23 +793,20 @@ html($ar);
 echo $script;
 ##########################
 
-
 function LoadFile($strRequestedUrl, $strFilename, $iTimeOut)
 {
 	global $proxyAddr, $proxyPort, $proxyUserName, $proxyPassword, $strUserAgent, $strRequestedSize;
 	$ssl = preg_match('#https://#', $strRequestedUrl);
 
-	$iTimeOut = IntVal($iTimeOut);
-	if ($iTimeOut>0)
-		$start_time = getmicrotime();
+	$iTimeOut = intval($iTimeOut);
+	if ($iTimeOut > 0)
+	{
+		$start_time = microtime(true);
+	}
 
 	$strRealUrl = $strRequestedUrl;
 	$iStartSize = 0;
-	$iRealSize = 0;
 
-	$bCanContinueDownload = False;
-
-	// ИНИЦИАЛИЗИРУЕМ, ЕСЛИ ДОКАЧКА
 	$strRealUrl_tmp = "";
 	$iRealSize_tmp = 0;
 	if (file_exists($strFilename.".tmp") && file_exists($strFilename.".log") && filesize($strFilename.".log")>0)
@@ -736,32 +821,25 @@ function LoadFile($strRequestedUrl, $strFilename, $iTimeOut)
 	}
 	if ($iRealSize_tmp<=0 || strlen($strRealUrl_tmp)<=0)
 	{
-		$strRealUrl_tmp = "";
-		$iRealSize_tmp = 0;
-
 		if (file_exists($strFilename.".tmp"))
+		{
 			@unlink($strFilename.".tmp");
+		}
 
 		if (file_exists($strFilename.".log"))
+		{
 			@unlink($strFilename.".log");
+		}
 	}
 	else
 	{
 		$strRealUrl = $strRealUrl_tmp;
-		$iRealSize = $iRealSize_tmp;
 		$iStartSize = filesize($strFilename.".tmp");
 	}
-	// КОНЕЦ: ИНИЦИАЛИЗИРУЕМ, ЕСЛИ ДОКАЧКА
 
-	//	SetCurrentStatus(LoaderGetMessage("LOADER_LOAD_QUERY_SERVER"));
-
-	// ИЩЕМ ФАЙЛ И ЗАПРАШИВАЕМ ИНФО
 	do
 	{
-		//		SetCurrentStatus(str_replace("#DISTR#", $strRealUrl, LoaderGetMessage("LOADER_LOAD_QUERY_DISTR")));
-
 		$lasturl = $strRealUrl;
-		$redirection = "";
 
 		$parsedurl = parse_url($strRealUrl);
 		$useproxy = (($proxyAddr != "") && ($proxyPort != ""));
@@ -769,7 +847,7 @@ function LoadFile($strRequestedUrl, $strFilename, $iTimeOut)
 		if (!$useproxy)
 		{
 			$host = $parsedurl["host"];
-			$port = $parsedurl["port"];
+			$port = $parsedurl["port"] ?? null;
 			$hostname = $host;
 		}
 		else
@@ -779,25 +857,24 @@ function LoadFile($strRequestedUrl, $strFilename, $iTimeOut)
 			$hostname = $parsedurl["host"];
 		}
 
-		$port = $port ? $port : ($ssl ? 443 : 80);
+		$port = $port ?: ($ssl ? 443 : 80);
 
-		//		SetCurrentStatus(str_replace("#HOST#", $host, LoaderGetMessage("LOADER_LOAD_CONN2HOST")));
 		$sockethandle = fsockopen(($ssl ? 'ssl://' : '').$host, $port, $error_id, $error_msg, 30);
 		if (!$sockethandle)
 		{
-			//			SetCurrentStatus(str_replace("#HOST#", $host, LoaderGetMessage("LOADER_LOAD_NO_CONN2HOST"))." [".$error_id."] ".$error_msg);
 			return false;
 		}
 		else
 		{
 			if (!$parsedurl["path"])
+			{
 				$parsedurl["path"] = "/";
+			}
 
-			//			SetCurrentStatus(LoaderGetMessage("LOADER_LOAD_QUERY_FILE"));
 			$request = "";
 			if (!$useproxy)
 			{
-				$request .= "HEAD ".$parsedurl["path"].($parsedurl["query"] ? '?'.$parsedurl["query"] : '')." HTTP/1.0\r\n";
+				$request .= "HEAD ".$parsedurl["path"].(isset($parsedurl["query"]) ? '?'.$parsedurl["query"] : '')." HTTP/1.0\r\n";
 				$request .= "Host: $hostname\r\n";
 			}
 			else
@@ -805,18 +882,19 @@ function LoadFile($strRequestedUrl, $strFilename, $iTimeOut)
 				$request .= "HEAD ".$strRealUrl." HTTP/1.0\r\n";
 				$request .= "Host: $hostname\r\n";
 				if ($proxyUserName)
+				{
 					$request .= "Proxy-Authorization: Basic ".base64_encode($proxyUserName.":".$proxyPassword)."\r\n";
+				}
 			}
 
 			if ($strUserAgent != "")
+			{
 				$request .= "User-Agent: $strUserAgent\r\n";
+			}
 
 			$request .= "\r\n";
 
 			fwrite($sockethandle, $request);
-
-			$result = "";
-			//			SetCurrentStatus(LoaderGetMessage("LOADER_LOAD_WAIT"));
 
 			$replyheader = "";
 			while (($result = fgets($sockethandle, 4024)) && $result!="\r\n")
@@ -827,24 +905,24 @@ function LoadFile($strRequestedUrl, $strFilename, $iTimeOut)
 
 			$ar_replyheader = explode("\r\n", $replyheader);
 
-			$replyproto = "";
-			$replyversion = "";
 			$replycode = 0;
 			$replymsg = "";
 			if (preg_match("#([A-Z]{4})/([0-9.]{3}) ([0-9]{3})#", $ar_replyheader[0], $regs))
 			{
-				$replyproto = $regs[1];
-				$replyversion = $regs[2];
-				$replycode = IntVal($regs[3]);
+				$replycode = intval($regs[3]);
 				$replymsg = substr($ar_replyheader[0], strpos($ar_replyheader[0], $replycode) + strlen($replycode) + 1, strlen($ar_replyheader[0]) - strpos($ar_replyheader[0], $replycode) + 1);
 			}
 
 			if ($replycode!=200 && $replycode!=302)
 			{
 				if ($replycode==403)
+				{
 					SetCurrentStatus(LoaderGetMessage("LOADER_LOAD_SERVER_ANSWER1"));
+				}
 				else
+				{
 					SetCurrentStatus(str_replace("#ANS#", $replycode." - ".$replymsg, LoaderGetMessage("LOADER_LOAD_SERVER_ANSWER")).'<br>'.htmlspecialchars($strRequestedUrl));
+				}
 				return false;
 			}
 
@@ -854,45 +932,42 @@ function LoadFile($strRequestedUrl, $strFilename, $iTimeOut)
 			for ($i = 1; $i < count($ar_replyheader); $i++)
 			{
 				if (strpos($ar_replyheader[$i], "Location") !== false)
+				{
 					$strLocationUrl = trim(substr($ar_replyheader[$i], strpos($ar_replyheader[$i], ":") + 1, strlen($ar_replyheader[$i]) - strpos($ar_replyheader[$i], ":") + 1));
+				}
 				elseif (strpos($ar_replyheader[$i], "Content-Length") !== false)
-					$iNewRealSize = IntVal(Trim(substr($ar_replyheader[$i], strpos($ar_replyheader[$i], ":") + 1, strlen($ar_replyheader[$i]) - strpos($ar_replyheader[$i], ":") + 1)));
+				{
+					$iNewRealSize = intval(Trim(substr($ar_replyheader[$i], strpos($ar_replyheader[$i], ":") + 1, strlen($ar_replyheader[$i]) - strpos($ar_replyheader[$i], ":") + 1)));
+				}
 				elseif (strpos($ar_replyheader[$i], "Accept-Ranges") !== false)
+				{
 					$strAcceptRanges = Trim(substr($ar_replyheader[$i], strpos($ar_replyheader[$i], ":") + 1, strlen($ar_replyheader[$i]) - strpos($ar_replyheader[$i], ":") + 1));
+				}
 			}
 
 			if (strlen($strLocationUrl)>0)
 			{
 				$redirection = $strLocationUrl;
-				$redirected = true;
 				if (!preg_match("#https?://#", $redirection))
+				{
 					$strRealUrl = dirname($lasturl)."/".$redirection;
+				}
 				else
+				{
 					$strRealUrl = $redirection;
+				}
 			}
 
 			if (strlen($strLocationUrl)<=0)
+			{
 				break;
+			}
 		}
 	}
 	while (true);
-	// КОНЕЦ: ИЩЕМ ФАЙЛ И ЗАПРАШИВАЕМ ИНФО
 
 	$bCanContinueDownload = ($strAcceptRanges == "bytes");
 
-	/*
-		// ЕСЛИ НЕЛЬЗЯ ДОКАЧИВАТЬ
-		if (!$bCanContinueDownload
-			|| ($iRealSize>0 && $iNewRealSize != $iRealSize))
-		{
-		//	SetCurrentStatus(LoaderGetMessage("LOADER_LOAD_NEED_RELOAD"));
-		//	$iStartSize = 0;
-			die(LoaderGetMessage("LOADER_LOAD_NEED_RELOAD"));
-		}
-		// КОНЕЦ: ЕСЛИ НЕЛЬЗЯ ДОКАЧИВАТЬ
-	*/
-
-	// ЕСЛИ МОЖНО ДОКАЧИВАТЬ
 	if ($bCanContinueDownload)
 	{
 		$fh = fopen($strFilename.".log", "wb");
@@ -905,19 +980,16 @@ function LoadFile($strRequestedUrl, $strFilename, $iTimeOut)
 		fwrite($fh, $iNewRealSize."\n");
 		fclose($fh);
 	}
-	// КОНЕЦ: ЕСЛИ МОЖНО ДОКАЧИВАТЬ
 
-	//	SetCurrentStatus(str_replace("#DISTR#", $strRealUrl, LoaderGetMessage("LOADER_LOAD_LOAD_DISTR")));
 	$strRequestedSize = $iNewRealSize;
 
-	// КАЧАЕМ ФАЙЛ
 	$parsedurl = parse_url($strRealUrl);
 	$useproxy = (($proxyAddr != "") && ($proxyPort != ""));
 
 	if (!$useproxy)
 	{
 		$host = $parsedurl["host"];
-		$port = $parsedurl["port"];
+		$port = $parsedurl["port"] ?? null;
 		$hostname = $host;
 	}
 	else
@@ -927,7 +999,7 @@ function LoadFile($strRequestedUrl, $strFilename, $iTimeOut)
 		$hostname = $parsedurl["host"];
 	}
 
-	$port = $port ? $port : ($ssl ? 443 : 80);
+	$port = $port ?: ($ssl ? 443 : 80);
 
 	SetCurrentStatus(str_replace("#HOST#", $host, LoaderGetMessage("LOADER_LOAD_CONN2HOST")));
 	$sockethandle = fsockopen(($ssl ? 'ssl://' : '').$host, $port, $error_id, $error_msg, 30);
@@ -939,14 +1011,16 @@ function LoadFile($strRequestedUrl, $strFilename, $iTimeOut)
 	else
 	{
 		if (!$parsedurl["path"])
+		{
 			$parsedurl["path"] = "/";
+		}
 
 		SetCurrentStatus(LoaderGetMessage("LOADER_LOAD_QUERY_FILE"));
 
 		$request = "";
 		if (!$useproxy)
 		{
-			$request .= "GET ".$parsedurl["path"].($parsedurl["query"] ? '?'.$parsedurl["query"] : '')." HTTP/1.0\r\n";
+			$request .= "GET ".$parsedurl["path"].(isset($parsedurl["query"]) ? '?'.$parsedurl["query"] : '')." HTTP/1.0\r\n";
 			$request .= "Host: $hostname\r\n";
 		}
 		else
@@ -954,37 +1028,40 @@ function LoadFile($strRequestedUrl, $strFilename, $iTimeOut)
 			$request .= "GET ".$strRealUrl." HTTP/1.0\r\n";
 			$request .= "Host: $hostname\r\n";
 			if ($proxyUserName)
+			{
 				$request .= "Proxy-Authorization: Basic ".base64_encode($proxyUserName.":".$proxyPassword)."\r\n";
+			}
 		}
 
 		if ($strUserAgent != "")
+		{
 			$request .= "User-Agent: $strUserAgent\r\n";
+		}
 
-		if ($bCanContinueDownload && $iStartSize>0)
+		if ($bCanContinueDownload && $iStartSize > 0)
+		{
 			$request .= "Range: bytes=".$iStartSize."-\r\n";
+		}
 
 		$request .= "\r\n";
 
 		fwrite($sockethandle, $request);
 
-		$result = "";
 		SetCurrentStatus(LoaderGetMessage("LOADER_LOAD_WAIT"));
 
 		$replyheader = "";
 		while (($result = fgets($sockethandle, 4096)) && $result!="\r\n")
+		{
 			$replyheader .= $result;
+		}
 
 		$ar_replyheader = explode("\r\n", $replyheader);
 
-		$replyproto = "";
-		$replyversion = "";
 		$replycode = 0;
 		$replymsg = "";
 		if (preg_match("#([A-Z]{4})/([0-9.]{3}) ([0-9]{3})#", $ar_replyheader[0], $regs))
 		{
-			$replyproto = $regs[1];
-			$replyversion = $regs[2];
-			$replycode = IntVal($regs[3]);
+			$replycode = intval($regs[3]);
 			$replymsg = substr($ar_replyheader[0], strpos($ar_replyheader[0], $replycode) + strlen($replycode) + 1, strlen($ar_replyheader[0]) - strpos($ar_replyheader[0], $replycode) + 1);
 		}
 
@@ -996,18 +1073,19 @@ function LoadFile($strRequestedUrl, $strFilename, $iTimeOut)
 
 		$strContentRange = "";
 		$iContentLength = 0;
-		$strAcceptRanges = "";
 		for ($i = 1; $i < count($ar_replyheader); $i++)
 		{
 			if (strpos($ar_replyheader[$i], "Content-Range") !== false)
+			{
 				$strContentRange = trim(substr($ar_replyheader[$i], strpos($ar_replyheader[$i], ":") + 1, strlen($ar_replyheader[$i]) - strpos($ar_replyheader[$i], ":") + 1));
+			}
 			elseif (strpos($ar_replyheader[$i], "Content-Length") !== false)
+			{
 				$iContentLength = doubleval(Trim(substr($ar_replyheader[$i], strpos($ar_replyheader[$i], ":") + 1, strlen($ar_replyheader[$i]) - strpos($ar_replyheader[$i], ":") + 1)));
-			elseif (strpos($ar_replyheader[$i], "Accept-Ranges") !== false)
-				$strAcceptRanges = Trim(substr($ar_replyheader[$i], strpos($ar_replyheader[$i], ":") + 1, strlen($ar_replyheader[$i]) - strpos($ar_replyheader[$i], ":") + 1));
+			}
 		}
-
-		$bReloadFile = True;
+		
+		$bReloadFile = true;
 		if (strlen($strContentRange)>0)
 		{
 			if (preg_match("# *bytes +([0-9]*) *- *([0-9]*) */ *([0-9]*)#i", $strContentRange, $regs))
@@ -1020,7 +1098,7 @@ function LoadFile($strRequestedUrl, $strFilename, $iTimeOut)
 					&& $iEndBytes_tmp==($iNewRealSize-1)
 					&& $iSizeBytes_tmp==$iNewRealSize)
 				{
-					$bReloadFile = False;
+					$bReloadFile = false;
 				}
 			}
 		}
@@ -1044,21 +1122,23 @@ function LoadFile($strRequestedUrl, $strFilename, $iTimeOut)
 			return false;
 		}
 
-		$bFinished = True;
+		$bFinished = true;
 		$downloadsize = (double) $iStartSize;
 		SetCurrentStatus(LoaderGetMessage("LOADER_LOAD_LOADING"));
 		while (!feof($sockethandle))
 		{
-			if ($iTimeOut>0 && (getmicrotime()-$start_time)>$iTimeOut)
+			if ($iTimeOut > 0 && (microtime(true) - $start_time) > $iTimeOut)
 			{
-				$bFinished = False;
+				$bFinished = false;
 				break;
 			}
 
 			$result = fread($sockethandle, 256 * 1024);
 			$downloadsize += strlen($result);
-			if ($result=="")
+			if ($result == "")
+			{
 				break;
+			}
 
 			fwrite($fh, $result);
 		}
@@ -1078,13 +1158,14 @@ function LoadFile($strRequestedUrl, $strFilename, $iTimeOut)
 			@unlink($strFilename.".tmp");
 		}
 		else
+		{
 			return 2;
+		}
 
 		SetCurrentStatus(str_replace("#SIZE#", $downloadsize, str_replace("#FILE#", $strFilename, LoaderGetMessage("LOADER_LOAD_FILE_SAVED"))));
 		@unlink($strFilename.".log");
 		return 1;
 	}
-	// КОНЕЦ: КАЧАЕМ ФАЙЛ
 }
 function html($ar)
 {
@@ -1502,7 +1583,7 @@ function html($ar)
 	</style>
 	<div class="wrap <?=LANG?>">
 		<header class="header">
-			<?if ($isCrm):?>
+			<?if ($isCrm || LANG != 'ru'):?>
 				<a href="" target="_blank" class="logo-link"><span class="logo <?=LANG?>"></span></a>
 			<?else:?>
 				<a href="" target="_blank" class="buslogo-link"><span class="buslogo <?=LANG?>"></span></a>
@@ -1519,7 +1600,7 @@ function html($ar)
 						</td>
 					</tr>
 					<tr>
-						<td style="font-size:10pt" valign="<?=$ar['TEXT_ALIGN']?$ar['TEXT_ALIGN']:'middle'?>"><?=$ar['TEXT']?></td>
+						<td style="font-size:10pt" valign="<?=($ar['TEXT_ALIGN'] ?? 'middle')?>"><?=$ar['TEXT']?></td>
 					</tr>
 					<tr>
 						<td style="font-size:10pt; padding-top: 20px" valign="middle" align="center" height="40px"><?=$ar['BOTTOM']?></td>
@@ -1531,7 +1612,13 @@ function html($ar)
 						<label for="ss"><span class="selected-lang lang <?=LANG?>"></span></label>
 						<div class="select-popup" id="lang-popup">
 							<?
-							foreach(array('en','de','ru') as $l)
+							$langs = array('en','de');
+							if (LANG == 'ru')
+							{
+								$langs = array('en','de','ru');
+							}
+								
+							foreach ($langs as $l)
 							{
 								?>
 								<div class="select-lang-item">
@@ -1566,7 +1653,7 @@ function SetCurrentStatus($str)
 	$strLog .= $str."\n";
 }
 
-function SetCurrentProgress($cur,$total=0,$red=true)
+function SetCurrentProgress($cur, $total = 0)
 {
 	global $status;
 	if (!$total)
@@ -1576,7 +1663,9 @@ function SetCurrentProgress($cur,$total=0,$red=true)
 	}
 	$val = intval($cur/$total*100);
 	if ($val > 99)
+	{
 		$val = 99;
+	}
 
 	$status = '
 	<div class="progressbar-container">
@@ -1587,12 +1676,6 @@ function SetCurrentProgress($cur,$total=0,$red=true)
 	</div>';
 }
 
-function getmicrotime()
-{
-	list($usec, $sec) = explode(" ", microtime());
-	return ((float)$usec + (float)$sec);
-}
-
 class CArchiver
 {
 	var $_strArchiveName = "";
@@ -1600,7 +1683,7 @@ class CArchiver
 	var $_strSeparator = " ";
 	var $_dFile = 0;
 
-	var $_arErrors = array();
+	var $_arErrors = [];
 	var $iArchSize = 0;
 	var $iCurPos = 0;
 	var $bFinish = false;
@@ -1618,7 +1701,7 @@ class CArchiver
 					fclose($fp);
 					if ($data == "\37\213")
 					{
-						$this->_bCompress = True;
+						$this->_bCompress = true;
 					}
 				}
 			}
@@ -1626,31 +1709,30 @@ class CArchiver
 			{
 				if (substr($strArchiveName, -2) == 'gz')
 				{
-					$this->_bCompress = True;
+					$this->_bCompress = true;
 				}
 			}
 		}
 		else
 		{
-			$this->_bCompress = True;
+			$this->_bCompress = true;
 		}
 
 		$this->_strArchiveName = $strArchiveName;
-		$this->_arErrors = array();
+		$this->_arErrors = [];
 	}
 
 	function extractFiles($strPath, $vFileList = false)
 	{
-		$this->_arErrors = array();
+		$this->_arErrors = [];
 
-		$v_result = true;
-		$v_list_detail = array();
+		$v_list_detail = [];
 
 		$strExtrType = "complete";
 		$arFileList = 0;
 		if ($vFileList!==false)
 		{
-			$arFileList = &$this->_parseFileParams($vFileList);
+			$arFileList = $this->_parseFileParams($vFileList);
 			$strExtrType = "partial";
 		}
 
@@ -1663,7 +1745,7 @@ class CArchiver
 		return $v_result;
 	}
 
-	function &GetErrors()
+	function GetErrors()
 	{
 		return $this->_arErrors;
 	}
@@ -1689,14 +1771,16 @@ class CArchiver
 
 		$p_remove_path = str_replace("\\", "/", $p_remove_path);
 		if (($p_remove_path != '') && (substr($p_remove_path, -1) != '/'))
+		{
 			$p_remove_path .= '/';
+		}
 
 		$p_remove_path_size = strlen($p_remove_path);
 
 		switch ($p_mode)
 		{
 			case "complete" :
-				$v_extract_all = TRUE;
+				$v_extract_all = true;
 				$v_listing = FALSE;
 				break;
 			case "partial" :
@@ -1705,7 +1789,7 @@ class CArchiver
 				break;
 			case "list" :
 				$v_extract_all = FALSE;
-				$v_listing = TRUE;
+				$v_listing = true;
 				break;
 			default :
 				$this->_arErrors[] = array("ERR_PARAM", "Invalid extract mode (".$p_mode.")");
@@ -1721,16 +1805,22 @@ class CArchiver
 			$v_extraction_stopped = 0;
 
 			if (!$this->_readHeader($v_binary_data, $v_header))
+			{
 				return false;
+			}
 
 			if ($v_header['filename'] == '')
+			{
 				continue;
+			}
 
 			// ----- Look for long filename
 			if ($v_header['typeflag'] == 'L')
 			{
 				if (!$this->_readLongHeader($v_header))
+				{
 					return false;
+				}
 			}
 
 
@@ -1748,25 +1838,25 @@ class CArchiver
 						if ((strlen($v_header['filename']) > strlen($p_file_list[$i]))
 							&& (substr($v_header['filename'], 0, strlen($p_file_list[$i])) == $p_file_list[$i]))
 						{
-							$v_extract_file = TRUE;
+							$v_extract_file = true;
 							break;
 						}
 					}
 					elseif ($p_file_list[$i] == $v_header['filename'])
 					{
 						// ----- It is a file, so compare the file names
-						$v_extract_file = TRUE;
+						$v_extract_file = true;
 						break;
 					}
 				}
 			}
 			else
 			{
-				$v_extract_file = TRUE;
+				$v_extract_file = true;
 			}
 
 			// ----- Look if this file need to be extracted
-			if (($v_extract_file) && (!$v_listing))
+			if ($v_extract_file && !$v_listing)
 			{
 				if (($p_remove_path != '')
 					&& (substr($v_header['filename'], 0, $p_remove_path_size) == $p_remove_path))
@@ -1776,12 +1866,18 @@ class CArchiver
 				if (($p_path != './') && ($p_path != '/'))
 				{
 					while (substr($p_path, -1) == '/')
+					{
 						$p_path = substr($p_path, 0, strlen($p_path)-1);
+					}
 
 					if (substr($v_header['filename'], 0, 1) == '/')
+					{
 						$v_header['filename'] = $p_path.$v_header['filename'];
+					}
 					else
+					{
 						$v_header['filename'] = $p_path.'/'.$v_header['filename'];
+					}
 				}
 				if (file_exists($v_header['filename']))
 				{
@@ -1850,7 +1946,7 @@ class CArchiver
 						clearstatcache();
 						if (filesize($v_header['filename']) != $v_header['size'])
 						{
-							$this->_arErrors[] = array("ERR_SIZE_CHECK", "Extracted file '".$v_header['filename']."' have incorrect file size '".filesize($v_filename)."' (".$v_header['size']." expected). Archive may be corrupted");
+							$this->_arErrors[] = array("ERR_SIZE_CHECK", "Extracted file '".$v_header['filename']."' have incorrect file size '".filesize($v_header['filename'])."' (".$v_header['size']." expected). Archive may be corrupted");
 							return false;
 						}
 					}
@@ -1868,19 +1964,25 @@ class CArchiver
 			if ($v_listing || $v_extract_file || $v_extraction_stopped)
 			{
 				if (($v_file_dir = dirname($v_header['filename'])) == $v_header['filename'])
+				{
 					$v_file_dir = '';
+				}
 				if ((substr($v_header['filename'], 0, 1) == '/') && ($v_file_dir == ''))
+				{
 					$v_file_dir = '/';
+				}
 
 				$p_list_detail[$v_nb++] = $v_header;
 
 				if ($v_nb % 100 == 0)
-					SetCurrentProgress($this->iCurPos, $this->iArchSize, False);
+				{
+					SetCurrentProgress($this->iCurPos, $this->iArchSize);
+				}
 			}
 
 			if ($_REQUEST['by_step'] && (time()-$tm) > TIMEOUT)
 			{
-				SetCurrentProgress($this->iCurPos, $this->iArchSize, False);
+				SetCurrentProgress($this->iCurPos, $this->iArchSize);
 				return true;
 			}
 		}
@@ -1896,18 +1998,26 @@ class CArchiver
 			if (isset($_REQUEST['seek']))
 			{
 				if ($this->_bCompress)
+				{
 					gzseek($this->_dFile, intval($_REQUEST['seek']));
+				}
 				else
+				{
 					fseek($this->_dFile, intval($_REQUEST['seek']));
+				}
 
-				$this->iCurPos = IntVal($_REQUEST['seek']);
+				$this->iCurPos = intval($_REQUEST['seek']);
 
 				unset($_REQUEST['seek']);
 			}
 			if ($this->_bCompress)
+			{
 				$v_block = gzread($this->_dFile, 512);
+			}
 			else
+			{
 				$v_block = fread($this->_dFile, 512);
+			}
 
 			$this->iCurPos +=  (extension_loaded("mbstring")? mb_strlen($v_block, "latin1") : strlen($v_block));
 		}
@@ -1925,7 +2035,7 @@ class CArchiver
 		if ((extension_loaded("mbstring")? mb_strlen($v_binary_data, "latin1") : strlen($v_binary_data)) != 512)
 		{
 			$v_header['filename'] = '';
-			$this->_arErrors[] = array("INV_BLOCK_SIZE", "Invalid block size : ".strlen($v_binary_data)."");
+			$this->_arErrors[] = array("INV_BLOCK_SIZE", "Invalid block size : ".strlen($v_binary_data));
 			return false;
 		}
 
@@ -1936,27 +2046,31 @@ class CArchiver
 
 		$v_data = unpack("a100filename/a8mode/a8uid/a8gid/a12size/a12mtime/a8checksum/a1typeflag/a100link/a6magic/a2version/a32uname/a32gname/a8devmajor/a8devminor/a155prefix/a12temp", $v_binary_data);
 
-		$v_header['checksum'] = OctDec(trim($v_data['checksum']));
+		$v_header['checksum'] = octdec(trim($v_data['checksum']));
 		if ($v_header['checksum'] != $v_checksum)
 		{
 			$v_header['filename'] = '';
 
 			if (($v_checksum == 256) && ($v_header['checksum'] == 0))
+			{
 				return true;
+			}
 
-			$this->_arErrors[] = array("INV_BLOCK_CHECK", "Invalid checksum for file '".$v_data['filename']."' : ".$v_checksum." calculated, ".$v_header['checksum']." expected");
+			$this->_arErrors[] = array("INV_BLOCK_CHECK", "Invalid checksum for file.");
 			return false;
 		}
 
 		// ----- Extract the properties
 		$v_header['filename'] = trim($v_data['prefix'], "\x00")."/".trim($v_data['filename'], "\x00");
-		$v_header['mode'] = OctDec(trim($v_data['mode']));
-		$v_header['uid'] = OctDec(trim($v_data['uid']));
-		$v_header['gid'] = OctDec(trim($v_data['gid']));
-		$v_header['size'] = OctDec(trim($v_data['size']));
-		$v_header['mtime'] = OctDec(trim($v_data['mtime']));
+		$v_header['mode'] = octdec(trim($v_data['mode']));
+		$v_header['uid'] = octdec(trim($v_data['uid']));
+		$v_header['gid'] = octdec(trim($v_data['gid']));
+		$v_header['size'] = octdec(trim($v_data['size']));
+		$v_header['mtime'] = octdec(trim($v_data['mtime']));
 		if (($v_header['typeflag'] = $v_data['typeflag']) == "5")
+		{
 			$v_header['size'] = 0;
+		}
 
 		return true;
 	}
@@ -1979,7 +2093,9 @@ class CArchiver
 		$v_binary_data = $this->_readBlock();
 
 		if (!$this->_readHeader($v_binary_data, $v_header))
+		{
 			return false;
+		}
 
 		$v_header['filename'] = trim($v_filename, "\x00");
 
@@ -1991,24 +2107,33 @@ class CArchiver
 		if (is_resource($this->_dFile))
 		{
 			if ($p_len === false)
+			{
 				$p_len = 1;
+			}
 
 			if ($this->_bCompress)
+			{
 				gzseek($this->_dFile, gztell($this->_dFile)+($p_len*512));
+			}
 			else
+			{
 				fseek($this->_dFile, ftell($this->_dFile)+($p_len*512));
+			}
 		}
 		return true;
 	}
 
-	function &_parseFileParams(&$vFileList)
+	function _parseFileParams(&$vFileList)
 	{
 		if (isset($vFileList) && is_array($vFileList))
+		{
 			return $vFileList;
+		}
 		elseif (isset($vFileList) && strlen($vFileList)>0)
+		{
 			return explode($this->_strSeparator, $vFileList);
-		else
-			return array();
+		}
+		return [];
 	}
 
 	function _openRead()
@@ -2039,9 +2164,13 @@ class CArchiver
 		if (is_resource($this->_dFile))
 		{
 			if ($this->_bCompress)
+			{
 				gzclose($this->_dFile);
+			}
 			else
+			{
 				fclose($this->_dFile);
+			}
 
 			$this->_dFile = 0;
 		}
@@ -2052,14 +2181,18 @@ class CArchiver
 	function _dirCheck($p_dir)
 	{
 		if ((is_dir($p_dir)) || ($p_dir == ''))
+		{
 			return true;
+		}
 
 		$p_parent_dir = dirname($p_dir);
 
 		if (($p_parent_dir != $p_dir) &&
 			($p_parent_dir != '') &&
 			(!$this->_dirCheck($p_parent_dir)))
+		{
 			return false;
+		}
 
 		if (!is_dir($p_dir) && !mkdir($p_dir, BX_DIR_PERMISSIONS))
 		{
@@ -2075,8 +2208,15 @@ class CArchiver
 function img($name)
 {
 	if (file_exists($_SERVER['DOCUMENT_ROOT'].'/images/'.$name))
+	{
 		return '/images/'.$name;
-	return 'https://www.1c-bitrix.ru/images/bitrix_setup/'.$name;
+	}
+	if (LANG == 'ru')
+	{
+		return 'https://www.1c-bitrix.ru/images/bitrix_setup/'.$name;
+	}
+	return 'https://www.bitrixsoft.com/images/bitrix_setup/'.$name;
+
 }
 
 function ShowError($str)
@@ -2086,10 +2226,10 @@ function ShowError($str)
 
 function bx_accelerator_reset()
 {
-	if(function_exists("accelerator_reset"))
+	if (function_exists("accelerator_reset"))
+	{
 		accelerator_reset();
-	elseif(function_exists("wincache_refresh_if_changed"))
-		wincache_refresh_if_changed();
+	}
 }
 
 function EscapePHPString($str)
@@ -2099,4 +2239,36 @@ function EscapePHPString($str)
 	$str = str_replace("\"", "\\"."\"", $str);
 	return $str;
 }
-?>
+
+function normalizePath($strPath)
+{
+	$strResult = '';
+	if($strPath <> '')
+	{
+		if(strncasecmp(PHP_OS, "WIN", 3) == 0)
+		{
+			//slashes doesn't matter for Windows
+			$strPath = str_replace("\\", "/", $strPath);
+		}
+
+		$arPath = explode('/', $strPath);
+		$nPath = count($arPath);
+		$pathStack = array();
+
+		for ($i = 0; $i < $nPath; $i++)
+		{
+			if ($arPath[$i] === ".")
+				continue;
+			if (($arPath[$i] === '') && ($i !== ($nPath - 1)) && ($i !== 0))
+				continue;
+
+			if ($arPath[$i] === "..")
+				array_pop($pathStack);
+			else
+				array_push($pathStack, $arPath[$i]);
+		}
+
+		$strResult = implode("/", $pathStack);
+	}
+	return $strResult;
+}

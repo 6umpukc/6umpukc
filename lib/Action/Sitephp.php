@@ -14,7 +14,7 @@ final class Sitephp extends ConfigPatcher
 
 	public function getDescription()
 	{
-		return 'bx ' . $this->getName() . ' [version] - Сменить версию php для проекта';
+		return 'bx ' . $this->getName() . ' [version] - Сменить версию php для сайта проекта';
 	}
 
 	protected function processSiteConfig(&$originalContent)

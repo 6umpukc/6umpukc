@@ -25,30 +25,51 @@ use Data::Dumper;
 
 # common functions
 
-sub init_default_env {
-	$ENV{'PHP_URLS_WIN32'} = 'https://windows.php.net/downloads/releases/php-8.2.27-Win32-vs16-x86.zip';
-	$ENV{'PHP_URLS_WIN64'} = 'https://windows.php.net/downloads/releases/php-8.2.27-Win32-vs16-x64.zip';
+sub init_php_urls {
+	my $phpVersion = '8.4.2';
+
+	$ENV{'PHP_URLS_WIN32'} = "https://windows.php.net/downloads/releases/php-$phpVersion-Win32-vs17-x86.zip";
+	$ENV{'PHP_URLS_WIN64'} = "https://windows.php.net/downloads/releases/php-$phpVersion-Win32-vs17-x64.zip";
 	$ENV{'PHP_URLS_MACOS'} = '';
 	$ENV{'PHP_URLS_LINUX'} = '';
+}
 
-	$ENV{'NODE_URLS_WIN32'} = 'https://nodejs.org/dist/v20.17.0/node-v20.17.0-win-x86.zip';
-	$ENV{'NODE_URLS_WIN64'} = 'https://nodejs.org/dist/v20.17.0/node-v20.17.0-win-x64.zip';
-	$ENV{'NODE_URLS_MACOS'} = 'https://nodejs.org/dist/v20.17.0/node-v20.17.0-darwin-x64.tar.gz';
-	$ENV{'NODE_URLS_LINUX'} = 'https://nodejs.org/dist/v20.17.0/node-v20.17.0-linux-x64.tar.gz';
+sub init_node20_urls {
+	my $nodeVersion20 = 'v20.18.1';
 
-	$ENV{'NODE14_URLS_WIN32'} = 'https://nodejs.org/dist/v14.21.3/node-v14.21.3-win-x86.zip';
-	$ENV{'NODE14_URLS_WIN64'} = 'https://nodejs.org/dist/v14.21.3/node-v14.21.3-win-x64.zip';
-	$ENV{'NODE14_URLS_MACOS'} = 'https://nodejs.org/dist/v14.21.3/node-v14.21.3-darwin-x64.tar.gz';
-	$ENV{'NODE14_URLS_LINUX'} = 'https://nodejs.org/dist/v14.21.3/node-v14.21.3-linux-x64.tar.gz';
+	$ENV{'NODE_URLS_WIN32'} = "https://nodejs.org/dist/$nodeVersion20/node-$nodeVersion20-win-x86.zip";
+	$ENV{'NODE_URLS_WIN64'} = "https://nodejs.org/dist/$nodeVersion20/node-$nodeVersion20-win-x64.zip";
+	$ENV{'NODE_URLS_MACOS'} = "https://nodejs.org/dist/$nodeVersion20/node-$nodeVersion20-darwin-x64.tar.gz";
+	$ENV{'NODE_URLS_LINUX'} = "https://nodejs.org/dist/$nodeVersion20/node-$nodeVersion20-linux-x64.tar.gz";
+}
 
-	$ENV{'BITRIX_SRC_MICRO'} = 'https://www.1c-bitrix.ru/download/start_encode_php5.tar.gz';
-	$ENV{'BITRIX_SRC_CORE'} = 'https://www.1c-bitrix.ru/download/start_encode_php5.tar.gz';
-	$ENV{'BITRIX_SRC_START'} = 'https://www.1c-bitrix.ru/download/start_encode_php5.tar.gz';
-	$ENV{'BITRIX_SRC_BUSINESS'} = 'https://www.1c-bitrix.ru/download/business_encode_php5.tar.gz';
-	$ENV{'BITRIX_SRC_CRM'} = 'https://www.1c-bitrix.ru/download/portal/bitrix24_encode_php5.tar.gz';
-	$ENV{'BITRIX_SRC_SETUP'} = 'https://www.1c-bitrix.ru/download/scripts/bitrixsetup.php';
-	$ENV{'BITRIX_SRC_RESTORE'} = 'https://www.1c-bitrix.ru/download/scripts/restore.php';
-	$ENV{'BITRIX_SRC_TEST'} = 'https://dev.1c-bitrix.ru/download/scripts/bitrix_server_test.php';
+sub init_node14_urls {
+	my $nodeVersion14 = 'v14.21.3';
+
+	$ENV{'NODE14_URLS_WIN32'} = "https://nodejs.org/dist/$nodeVersion14/node-$nodeVersion14-win-x86.zip";
+	$ENV{'NODE14_URLS_WIN64'} = "https://nodejs.org/dist/$nodeVersion14/node-$nodeVersion14-win-x64.zip";
+	$ENV{'NODE14_URLS_MACOS'} = "https://nodejs.org/dist/$nodeVersion14/node-$nodeVersion14-darwin-x64.tar.gz";
+	$ENV{'NODE14_URLS_LINUX'} = "https://nodejs.org/dist/$nodeVersion14/node-$nodeVersion14-linux-x64.tar.gz";
+}
+
+sub init_bitrix_src_urls {
+	my $baseUrl = 'https://www.1c-bitrix.ru/download/';
+
+	$ENV{'BITRIX_SRC_MICRO'} = $baseUrl . 'start_encode_php5.tar.gz';
+	$ENV{'BITRIX_SRC_CORE'} = $baseUrl . 'start_encode_php5.tar.gz';
+	$ENV{'BITRIX_SRC_START'} = $baseUrl . 'start_encode_php5.tar.gz';
+	$ENV{'BITRIX_SRC_BUSINESS'} = $baseUrl . 'business_encode_php5.tar.gz';
+	$ENV{'BITRIX_SRC_CRM'} = $baseUrl . 'portal/bitrix24_encode_php5.tar.gz';
+	$ENV{'BITRIX_SRC_SETUP'} = $baseUrl . 'scripts/bitrixsetup.php';
+	$ENV{'BITRIX_SRC_RESTORE'} = $baseUrl . 'scripts/restore.php';
+	$ENV{'BITRIX_SRC_TEST'} = $baseUrl . 'scripts/bitrix_server_test.php';
+}
+
+sub init_default_env {
+	init_php_urls();
+	init_node20_urls();
+	init_node14_urls();
+	init_bitrix_src_urls();
 
 	$ENV{'BX_MKCERT'} = 'bx.local *.bx.local';
 
@@ -1563,6 +1584,12 @@ sub action_fetch {
 	}
 }
 
+sub action_fetch_scripts {
+	system('bx fetch setup');
+	system('bx fetch restore');
+	system('bx fetch test');
+}
+
 sub action_env {
 	my $basePath = shift;
 	require_site_root($basePath);
@@ -1732,6 +1759,10 @@ my %actions = (
 
 	'fetch' => {
 		'fn' => \&action_fetch,
+	},
+
+	'fetch-scripts' => {
+		'fn' => \&action_fetch_scripts,
 	},
 
 	'env' => {

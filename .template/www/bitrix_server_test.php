@@ -1,6 +1,6 @@
 <?php
 #####################################
-define('LAST_MODIFIED','25.11.2019');
+define('LAST_MODIFIED','29.02.2024');
 #####################################
 
 ob_implicit_flush(true);
@@ -11,18 +11,30 @@ if (@$_REQUEST['debug'])
 	ini_set("display_errors",1);
 }
 else
+{
 	error_reporting(0);
-$PHP_MIN = '7.1';
+}
+$PHP_MIN = '8.1';
 $MYSQL_MIN = '5.6';
 
 if (function_exists('mb_internal_encoding'))
+{
 	mb_internal_encoding('ISO-8859-1');
+}
 
 $image_file = "bitrix_test_image.gif";
 
-$bTest = $_REQUEST['start_test'] ? true : false;
+$bTest = !empty($_REQUEST['start_test']);
 
-$lang=$_REQUEST['lang']?($_REQUEST['lang']=='ru'?'ru':'en'):(@preg_match('#ru#i',$_SERVER['HTTP_ACCEPT_LANGUAGE'])?'ru':'en');
+if (!empty($_REQUEST['lang']))
+{
+	$lang =  ($_REQUEST['lang'] == 'ru' ? 'ru' : 'en');
+}
+else
+{
+	$lang =  (@preg_match('#ru#i',$_SERVER['HTTP_ACCEPT_LANGUAGE']) ? 'ru' : 'en');
+}
+
 header("Content-type:text/html; charset=utf-8");
 
 $M=array();
@@ -38,13 +50,13 @@ if ($lang=='en')
 	$M['TOP_SELECT_TYPE']='Select: ';
 	$M['TOP_TAR1']=' Required settings';
 	$M['TOP_TAR2']=' Recommended settings';
-	$M['TOP_LINKS']='<br><a href="https://training.bitrix24.com/support/training/course/?COURSE_ID=22" target=_blank>Training course &quot;Configuring Web Systems for Best Performance&quot;</a><br><br>'; 
+	$M['TOP_LINKS']='<br><a href="https://training.bitrix24.com/support/training/course/?COURSE_ID=22" target=_blank>Training course &quot;Configuring Web Systems for Best Performance&quot;</a><br><br>';
 	$M['START_TEST']='Start testing';
 	$M['CONF_GENERAL']='General';
-	$M['CONF_FS']='File system'; 
+	$M['CONF_FS']='File system';
 	$M['SENDFILE']='send file';
 	$M['CONF_EXT']='PHP extensions';
-	$M['CONF_MYSQL']='MySQL configuration'; 
+	$M['CONF_MYSQL']='MySQL configuration';
 	$M['CONF_ADD']='Additional Information';
 	$M['OPEN']='open';
 	$M['COPY']='&nbsp;&copy; Bitrix Site Manager, 2001-';
@@ -70,14 +82,14 @@ if ($lang=='en')
 	$M['TEST_SESS_DESC']='Required for saving authorization';
 	$M['TEST_SESS_UA']="Sessions saving without UserAgent";
 	$M['TEST_SESS_UA_DESC']='Required for file upload plugin';
-	$M['SHORT_TAG']="short_open_tag value"; 
-	$M['SHORT_TAG_DESC']='short_open_tag=off is not supported'; 
+	$M['SHORT_TAG']="short_open_tag value";
+	$M['SHORT_TAG_DESC']='short_open_tag=off is not supported';
 	$M['MEM_LIMIT']="memory_limit value";
 	$M['MEM_LIMIT_DESC']='Memory limit settings should be not less than 32M (64M for "Professional" and higher editions). It is recommended to disable unused PHP modules in php.ini file to increase the memory size available to applications.';
 	$M['MEM_FACT']="Actual memory limit";
 	$M['MEM_FACT_DESC']='Sometimes, actual memory limit differs from PHP settings';
 	$M['SENDMAIL']="Email Sending";
-	$M['SENDMAIL_DESC']='Attempt to call the mail() function'; 
+	$M['SENDMAIL_DESC']='Attempt to call the mail() function';
 	$M['MCRYPT_TEST']='Mcrypt module';
 	$M['HASH_TEST']='Hash module';
 	$M['MCRYPT_TEST_DESC']='Required for secure cloud backup';
@@ -87,11 +99,11 @@ if ($lang=='en')
 	$M['SYSUPDATE_DESC']='Attempt to connect to the www.bitrix24.com on port 80';
 	$M['NO_CONNECT']='No connection';
 	$M['HTTP_AUTH']="HTTP authorization";
-	$M['1C_1']='Necessary for the integration with MS Outlook. Connecting to<b>'; 
+	$M['1C_1']='Necessary for the integration with MS Outlook. Connecting to<b>';
 	$M['1C_2']='</b> on <b>';
 	$M['1C_3']='</b> port';
 	$M['SET_TM']="Setting of set_time_limit";
-	$M['SET_TM_DESC']='For correct work of the SiteUpdate system and system agents it is recommended to allow managing of the max_execution_time parameter value through the set_time_limit function in product scripts.'; 
+	$M['SET_TM_DESC']='For correct work of the SiteUpdate system and system agents it is recommended to allow managing of the max_execution_time parameter value through the set_time_limit function in product scripts.';
 	$M['TIME_TEST']="Execution time test";
 	$M['TIME_TEST_CPU']="Execution time test with CPU load";
 	$M['TIME_TEST_CPU_DESC']="";
@@ -102,7 +114,7 @@ if ($lang=='en')
 	$M['CONFLICT']='conflict';
 	$M['NOT_FOUND']='not found';
 	$M['D_SPACE']="Disk space";
-	$M['D_SPACE_DESC']='It is recommended to have not less than 500M for the Start Edition and 1500M for the Enterprise Edition'; 
+	$M['D_SPACE_DESC']='It is recommended to have not less than 500M for the Start Edition and 1500M for the Enterprise Edition';
 	$M['F_PERM']='Permissions for the current folder';
 	$M['F_CREATE']='Folder creation';
 	$M['F_CREATE_DESC']='Attempt to create a test folder';
@@ -116,7 +128,7 @@ if ($lang=='en')
 	$M['FL_EXEC_D']='Sometimes, there are problems with executing files created with PHP';
 	$M['NOT_TESTED']='not tested';
 	$M['HTACCESS']='Processing .htaccess files';
-	$M['HTACCESS_D']='Attempting to configure 404-error handling for a newly created folder'; 
+	$M['HTACCESS_D']='Attempting to configure 404-error handling for a newly created folder';
 	$M['FILE_UPL']='file_uploads value';
 	$M['FILE_UPL_TEST']='File upload';
 	$M['FILE_UPL_TEST_D']='Test upload of GIF image';
@@ -126,16 +138,16 @@ if ($lang=='en')
 	$M['PREG']='Perl regular expressions';
 	$M['ZLIB_D']='Required for correct Compression module work and fast updates loading';
 	$M['GDLIB']='Displaying graphs in the statistics and working with images';
-	$M['GDLIB_D']='Required for CAPTCHA functionality'; 
+	$M['GDLIB_D']='Required for CAPTCHA functionality';
 	$M['SSL']='SSL support';
-	$M['SSL_D']='Required for correct eStore module work with external payment systems plugins'; 
+	$M['SSL_D']='Required for correct eStore module work with external payment systems plugins';
 	$M['MBSTR']='mbstring support';
-	$M['MBSTR_D']='Required for correct product work with UTF-8'; 
+	$M['MBSTR_D']='Required for correct product work with UTF-8';
 	$M['MYSQL']='MySQL functions';
 	$M['MYSQL_D']='MySQL functions are mandatory';
 	$M['MYSQL_CONNECT']='Connection to MySQL server';
 	$M['MYSQL_VER']='MySQL server version';
-	$M['MYSQL_REQ']='MySQL '.$MYSQL_MIN.' and higher (No alpha or beta releases are allowed).'; 
+	$M['MYSQL_REQ']='MySQL '.$MYSQL_MIN.' and higher (No alpha or beta releases are allowed).';
 	$M['MYSQL_SELECT_DB']='Database selection';
 	$M['INNODB']='InnoDB Support';
 	$M['DB_TEST_TABLE']='Creating a test table';
@@ -149,8 +161,8 @@ if ($lang=='en')
 	$M['DB_NAME']='DB name';
 	$M['DB_USER']='User';
 	$M['DB_PASS']='Password';
-	$M['SHOW_ERR']='Display errors'; 
-	$M['SHOW_ERR_D']='Turns on error displaying for this page and writes the file <a href="bitrix_server_test.log" target="_blank">bitrix_server_test.log</a>'; 
+	$M['SHOW_ERR']='Display errors';
+	$M['SHOW_ERR_D']='Turns on error displaying for this page and writes the file <a href="bitrix_server_test.log" target="_blank">bitrix_server_test.log</a>';
 	$M['POST_MS']="post_max_size value";
 	$M['ERROR']='Error';
 	$M['YES']='Yes';
@@ -213,7 +225,7 @@ else
 	$M['SHORT_TAG']="Значение short_open_tag";
 	$M['SHORT_TAG_DESC']='short_open_tag=off не поддерживается';
 	$M['MEM_LIMIT']="Значение memory_limit";
-	$M['MEM_LIMIT_DESC']='Ограничение памяти должно быть не ниже 32 Мб (64 Мб для старших редакций начиная с "Эксперта"). Неиспользуемые PHP модули в php.ini желательно отключить чтобы увеличить размер памяти, доступной для приложений.';
+	$M['MEM_LIMIT_DESC']='Ограничение памяти должно быть не ниже 32 МБ (64 МБ для старших редакций начиная с "Эксперта"). Неиспользуемые PHP модули в php.ini желательно отключить чтобы увеличить размер памяти, доступной для приложений.';
 	$M['MEM_FACT']="Фактическое ограничение памяти";
 	$M['MEM_FACT_DESC']='Иногда фактическое ограничение памяти может отличаться от установок php';
 	$M['SENDMAIL']="Отправка почты";
@@ -241,7 +253,7 @@ else
 	$M['CONFLICT']='конфликт';
 	$M['NOT_FOUND']='не обнаружен';
 	$M['D_SPACE']="Место на диске";
-	$M['D_SPACE_DESC']='Не менее 500 Мб для редакции "Старт" и не менее 1500 Мб для редакции "Бизнес"';
+	$M['D_SPACE_DESC']='Не менее 500 МБ для редакции "Старт" и не менее 1500 МБ для редакции "Бизнес"';
 	$M['F_PERM']="Права на текущую папку";
 	$M['F_CREATE']="Создание папки";
 	$M['F_CREATE_DESC']='Попытка создать тестовую папку';
@@ -304,48 +316,52 @@ else
 	$M["max_input_vars"] = "Должно быть не меньше 10000";
 }
 
-if (@$_GET['auth_test']) 
+if (@$_GET['auth_test'])
 {
 	$remote_user = $_SERVER["REMOTE_USER"] ? $_SERVER["REMOTE_USER"] : $_SERVER["REDIRECT_REMOTE_USER"];
 	$strTmp = base64_decode(substr($remote_user,6));
 	if ($strTmp)
+	{
 		list($_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW']) = explode(':', $strTmp);
-	
-	if ($_SERVER['PHP_AUTH_USER']=='test_user' && $_SERVER['PHP_AUTH_PW']=='test_password') 
+	}
+
+	if ($_SERVER['PHP_AUTH_USER']=='test_user' && $_SERVER['PHP_AUTH_PW']=='test_password')
+	{
 		die('SUCCESS');
+	}
 	else
 	{
 		header('HTTP/1.x 401 Authorization required');
 		header('WWW-Authenticate: Basic realm="Restricted area"');
 		die('<h1>401 Authorization required</h1>');
 	}
-} 
-elseif (@$_GET['session_test']) 
+}
+elseif (@$_GET['session_test'])
 {
 	session_start();
-	if ($_SESSION['session_test']=='ok') 
+	if ($_SESSION['session_test']=='ok')
 		die('SUCCESS');
 	else
 		die('Fault');
-} 
-elseif (@$_GET['image']) 
+}
+elseif (@$_GET['image'])
 {
 	header("Content-type: image/gif");
 	echo file_get_contents($image_file);
 	@unlink($image_file);
 	die();
-} 
-elseif (@$_GET['phpinfo']) 
+}
+elseif (@$_GET['phpinfo'])
 {
 	phpinfo();
 	die();
-} 
-elseif (@$_GET['time_test']) 
+}
+elseif (@$_GET['time_test'])
 {
 	@set_time_limit(300);
 	@ini_set('max_execution_time',300);
 	$t=time();
-	while(time()-$t < 60) 
+	while(time()-$t < 60)
 	{
 		if ($_GET['max_cpu'])
 			date('Y-m-d H:i:s');
@@ -353,8 +369,8 @@ elseif (@$_GET['time_test'])
 			sleep(1);
 	}
 	die("SUCCESS");
-} 
-elseif (@$_GET['memory_test']) 
+}
+elseif (@$_GET['memory_test'])
 {
 	$max=intval($_GET['max']);
 	if (!$max) $max = 255;
@@ -370,7 +386,6 @@ elseif(@$_GET['killme']=='Y')
 }
 
 session_start();
-
 
 ?><!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <!-- last modified <?php echo LAST_MODIFIED ?> -->
@@ -418,7 +433,7 @@ session_start();
 	.menu{ background-color:#E6F1F9; font-family:Verdana, Arial, Helvetica, sans-serif; color:#B4C0D0; font-size:12px; padding-left:10px; padding-right:5px;}
 	.menuact{background-color:#D8E8F4; font-family:Verdana, Arial, Helvetica, sans-serif; color:#365069; font-size:12px; padding-left:10px; padding-right:5px; font-weight:bold;}
 	.text11 {font-family:Verdana,Arial, Helvetica, sans-serif; font-weight:normal; color:#365069; font-size:12px; margin-bottom: 5px;}
-	
+
 	a {color:#4182b6;}
 	a:hover {color:#4182f6;}
 </style>
@@ -489,7 +504,7 @@ if (!$_REQUEST['UPDATE_SUCCESS'] && !file_exists(dirname(__FILE__).'/bitrix_serv
 	$bx_url = '/download/files/scripts/'.$this_script_name;
 	$res = @fsockopen($bx_host, 80, $errno, $errstr, 3);
 
-	if($res) 
+	if($res)
 	{
 		$strRequest = "HEAD ".$bx_url." HTTP/1.1\r\n";
 		$strRequest.= "Host: ".$bx_host."\r\n";
@@ -534,7 +549,7 @@ $strSERVER_SOFTWARE = $_SERVER["SERVER_SOFTWARE"];
 if (strlen($strSERVER_SOFTWARE)<=0)
 	$strSERVER_SOFTWARE = $_SERVER["SERVER_SIGNATURE"];
 
-$strSERVER_SOFTWARE = Trim($strSERVER_SOFTWARE);
+$strSERVER_SOFTWARE = trim($strSERVER_SOFTWARE);
 if (@preg_match("#^([a-zA-Z-]+).*?([\d]+\.[\d]+(\.[\d]+)?)#i", $strSERVER_SOFTWARE, $arSERVER_SOFTWARE))
 {
 	$strWebServer = $arSERVER_SOFTWARE[1];
@@ -622,7 +637,7 @@ if ($bTest)
 	else
 		$res = false;
 
-	if($res) 
+	if($res)
 	{
 		$strRequest = "GET ".dirname($_SERVER['PHP_SELF'])."/bitrix_server_test.php?session_test=Y HTTP/1.1\r\n";
 		$strRequest.= "Host: ".$host."\r\n";
@@ -636,7 +651,7 @@ if ($bTest)
 			$val = $ok = GM('YES');
 		else
 			$val = GM('NO');
-	} 
+	}
 	else
 		$val=GM('NO_CONNECT');
 	show($pr,$val,!$ok);
@@ -652,7 +667,7 @@ if ($bTest)
 		$res = fsockopen("www.1c-bitrix.ru", "80", $errno, $errstr, 3);
 	else
 		$res = false;
-	if($res) 
+	if($res)
 	{
 		$strRequest = "POST /bitrix/updates/sysserver.php HTTP/1.1\r\n";
 		$strRequest.= "User-Agent: BitrixSMUpdater\r\n";
@@ -667,11 +682,11 @@ if ($bTest)
 		$strRes = getHttpResponse($res, $strRequest);
 		fclose($res);
 
-		if (strtolower(strip_tags($strRes)) == "license key is invalid")
+		if (strtolower(strip_tags($strRes)) == "license key is required")
 			$val = $ok = 1;
 		else
 			$val = GM('WRONG_ANS')." <a href='javascript:alert(\"".addslashes($strRes)."\")' title='".GM('SERVER_ANS')."'>&gt;&gt;</a>";
-	} 
+	}
 	else
 		$val=GM('NO_CONNECT');
 	show($pr,$val,!$ok);
@@ -690,7 +705,7 @@ if ($bTest)
 	else
 		$res = false;
 
-	if($res) 
+	if($res)
 	{
 		$url = parse_url($_SERVER['REQUEST_URI']);
 		$strRequest = "GET ".$url['path']."?auth_test=Y HTTP/1.1\r\n";
@@ -711,7 +726,7 @@ if ($bTest)
 		}
 		else
 			$val = GM('NO');
-	} 
+	}
 	else
 		$val=GM('NO_CONNECT');
 	show($pr,$val,!$ok);
@@ -737,7 +752,7 @@ show($pr,"<div id=time_test_cpu><font color=gray>".GM('NOT_TESTED')."</font></di
 debug(__LINE__);
 $res = "";
 $pr = array(GM('PHP_ACC'),GM('PHP_ACC_DESC'),2);
-if ($val = function_exists("eaccelerator_info")) 
+if ($val = function_exists("eaccelerator_info"))
 {
 	$res = "EAccelerator";
 	$val = false;
@@ -816,7 +831,7 @@ else
 	show($pr,'<font color=gray>'.GM('NOT_TESTED').'</font>');
 
 
-if ($file) 
+if ($file)
 {
 	// dirinfo
 debug(__LINE__);
@@ -850,7 +865,7 @@ if ($file && $bTest)
 	else
 		$res = false;
 
-	if($res) 
+	if($res)
 	{
 		$strRequest = "GET ".dirname($_SERVER['PHP_SELF'])."/bitrix_test_exec.php HTTP/1.1\r\n";
 		$strRequest.= "Host: ".$host."\r\n";
@@ -863,7 +878,7 @@ if ($file && $bTest)
 			$val = $ok = GM('YES');
 		else
 			$val = GM('NO');
-	} 
+	}
 	else
 		$val=GM('NO_CONNECT');
 	show($pr,$val,!$ok);
@@ -879,14 +894,14 @@ $host = $_SERVER['SERVER_NAME'] ? $_SERVER['SERVER_NAME'] : 'localhost';
 $port = $_SERVER['SERVER_PORT'] ? $_SERVER['SERVER_PORT'] : 80;
 
 $pr=array(GM('HTACCESS'),GM('HTACCESS_D'),1);
-if ($bTest && $file && $dir && prepare_htaccess_test()) 
+if ($bTest && $file && $dir && prepare_htaccess_test())
 {
 	if ($socket)
 		$res = fsockopen(($port == 443 ? 'ssl://' : '').$host, $port, $errno, $errstr, 3);
 	else
 		$res = false;
 
-	if($res) 
+	if($res)
 	{
 		$strRequest = "GET ".dirname($_SERVER['PHP_SELF'])."/bitrix_htaccess_test/test_file.php HTTP/1.1\r\n";
 		$strRequest.= "Host: ".$host."\r\n";
@@ -899,29 +914,29 @@ if ($bTest && $file && $dir && prepare_htaccess_test())
 			$val = $ok = GM('YES');
 		else
 			$val = GM('NO');
-	} 
+	}
 	else
 		$val=GM('NO_CONNECT');
 	show($pr,$val,!$ok);
 
 	clear_htaccess_test();
-} 
-else 
+}
+else
 	show($pr,GM('NOT_TESTED'),1);
 
 // Filesystem benchmark
 debug(__LINE__);
 $pr=array(GM('FS_TIME'),GM('FS_TIME_D'));
-if ($bTest && $file && $dir) 
+if ($bTest && $file && $dir)
 {
 	function xmktime()
 	{
-		list($usec, $sec) = explode(" ", microtime()); 
-		return ((float)$usec + (float)$sec); 
+		list($usec, $sec) = explode(" ", microtime());
+		return ((float)$usec + (float)$sec);
 	}
 
 	$t = xmktime();
-	$path = dirname(__FILE__).'/bx_fs_test'; 
+	$path = dirname(__FILE__).'/bx_fs_test';
 	mkdir($path);
 	$res = true;
 
@@ -1037,7 +1052,7 @@ $pr=array(GM('SSL'),GM('SSL_D'),2);
 
 if ($bTest)
 {
-	$f=fsockopen("ssl://www.1c-bitrix.ru",443, $errno, $errstr, 10); 
+	$f=fsockopen("ssl://www.1c-bitrix.ru",443, $errno, $errstr, 10);
 	$val = $f ? 1 : 0;
 	show($pr,$val,!$val);
 	@fclose($f);
@@ -1063,7 +1078,7 @@ if ($val && $lang=='ru')
 	$res = strtolower($text0);
 	$val = $res==$text1 || $res==$text0;
 	show(array("Работа функции strtolower",'Тестируется функция strtolower для русских букв. Важно чтобы не было обратного преобразования: "ТеСт" -&gt; "ТЕСТ" вместо "тест"',1),$val,!$val);
-	
+
 
 	$l = strlen("\xd0\xa2");
 	$val = $utf && $l==1 || !$utf && $l==2;
@@ -1128,7 +1143,7 @@ if ($mysql && ($bTest || $_REQUEST['mysql_test']))
 		if ($mysqli ? mysqli_select_db($conn, $DBName) : mysql_select_db($DBName))
 		{
 			show(GM('MYSQL_SELECT_DB'),1,0);
-			
+
 			$name=create_tmp_table(true); // InnoDB
 			$res=bx_mysql_query("SHOW CREATE TABLE $name");
 			$f=bx_mysql_fetch_row($res);
@@ -1136,7 +1151,7 @@ if ($mysql && ($bTest || $_REQUEST['mysql_test']))
 			show(array(GM('INNODB'),'',2),$val,!$val);
 			if ($name)
 				bx_mysql_query("DROP TABLE ".$name);
-			
+
 // Temporary table
 debug(__LINE__);
 			$name=create_tmp_table();
@@ -1144,7 +1159,7 @@ debug(__LINE__);
 			{
 				show(array(GM('DB_TEST_TABLE'),'',1),1,0);
 
-				
+
 				$t1=microtime_float();
 				$good=true;
 // Insert 1000 rows
@@ -1262,7 +1277,7 @@ function show($in_param,$value,$red='no') {
 			<td class=tablebody3 valign=top><font class=smalltext>$help&nbsp;</font></td>
 		</tr>
 		</table>");
-		
+
 }
 
 function dirinfo($dir) {
@@ -1302,7 +1317,7 @@ function create_tmp_file()
 		return false;
 }
 
-function check_file_name($name) 
+function check_file_name($name)
 {
 	if (file_exists($name))
 		return check_file_name($name."_tmp");
@@ -1366,7 +1381,7 @@ function clear_htaccess_test()
 {
 	$self = str_replace("\\","/",$_SERVER['PHP_SELF']);
 	$dir = $_SERVER['DOCUMENT_ROOT'].dirname($self)."/bitrix_htaccess_test";
-	if (file_exists($dir)) 
+	if (file_exists($dir))
 	{
 		unlink($dir."/.htaccess");
 		unlink($dir."/404.php");
@@ -1393,12 +1408,12 @@ function getHttpResponse($res, $strRequest)
 		$maxReadSize = 4096;
 
 		$length = 0;
-		$line = FGets($res, $maxReadSize);
-		$line = StrToLower($line);
+		$line = fgets($res, $maxReadSize);
+		$line = strtolower($line);
 
 		$strChunkSize = "";
 		$i = 0;
-		while ($i < StrLen($line) && in_array($line[$i], array("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f")))
+		while ($i < strlen($line) && in_array($line[$i], array("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f")))
 		{
 			$strChunkSize .= $line[$i];
 			$i++;
@@ -1414,20 +1429,20 @@ function getHttpResponse($res, $strRequest)
 			while ($readSize > 0 && $line = fread($res, $readSize))
 			{
 				$strRes .= $line;
-				$processedSize += StrLen($line);
+				$processedSize += strlen($line);
 				$newSize = $chunkSize - $processedSize;
 				$readSize = (($newSize > $maxReadSize) ? $maxReadSize : $newSize);
 			}
 			$length += $chunkSize;
 
-			$line = FGets($res, $maxReadSize);
+			$line = fgets($res, $maxReadSize);
 
-			$line = FGets($res, $maxReadSize);
-			$line = StrToLower($line);
+			$line = fgets($res, $maxReadSize);
+			$line = strtolower($line);
 
 			$strChunkSize = "";
 			$i = 0;
-			while ($i < StrLen($line) && in_array($line[$i], array("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f")))
+			while ($i < strlen($line) && in_array($line[$i], array("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f")))
 			{
 				$strChunkSize .= $line[$i];
 				$i++;
@@ -1477,9 +1492,9 @@ function debug($line)
 </tr>
 </table>
 </body>
-<?php 
-if ($bTest) 
-{ 
+<?php
+if ($bTest)
+{
 ?>
 	<script language=JavaScript>
 		var last_mem = 8;
@@ -1515,8 +1530,8 @@ if ($bTest)
 		function AjaxSend(xml, url, callback)
 		{
 			if (null!=callback)
-				xml.onreadystatechange = function () 
-				{ 
+				xml.onreadystatechange = function ()
+				{
 					if (xml.readyState == 4 || xml.readyState=="complete")
 						callback(xml.responseText);
 				}
@@ -1572,7 +1587,7 @@ if ($bTest)
 			AjaxSend(xml, '?memory_test=Y&debug=Y&max=' + max_mem, callback);
 		}
 
-		function my_timer() 
+		function my_timer()
 		{
 			tmr--;
 			tmr1++;
@@ -1581,7 +1596,7 @@ if ($bTest)
 				res = '<font color=red><?php echo GM('NO');?></font>';
 				clearInterval(my_interval);
 			}
-			else 
+			else
 				res = '<font color=gray><?php echo GM('TESTING');?> (' + tmr + ')</font>';
 			time_test.innerHTML = res;
 		}
@@ -1590,7 +1605,7 @@ if ($bTest)
 		{
 			// time test
 			xml = NewXML();
-			callback = function(a) 
+			callback = function(a)
 			{
 				if (a == 'SUCCESS')
 					res = '<font color=green><?php echo GM('YES');?></font>';
@@ -1600,10 +1615,10 @@ if ($bTest)
 				clearInterval(my_interval);
 			}
 			AjaxSend(xml, "?time_test=Y", callback);
-			
+
 			// time test with max cpu
 			xml = NewXML();
-			callback = function(a) 
+			callback = function(a)
 			{
 				if (a == 'SUCCESS')
 					res = '<font color=green><?php echo GM('YES');?></font>';
@@ -1627,12 +1642,12 @@ if ($bTest)
 				document.getElementById('session').innerHTML = res;
 			}
 			AjaxSend(xml, '?session_test=Y',callback);
-			
+
 			// memory test
 			memory_test(last_mem);
 		}
 	</script>
-<?php 
+<?php
 }
 
 // Finish
@@ -1664,4 +1679,3 @@ function bx_mysql_fetch_row($res)
 		return mysql_fetch_row($res);
 
 }
-?>

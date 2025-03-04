@@ -145,6 +145,7 @@ final class Shell
 			static::runGetContent('lsb_release -a' . ' 2>/dev/null', $os, true);
 
 			$result = (mb_stripos($os, 'debian') !== false)
+				|| (mb_stripos($os, 'elementary') !== false)
 				|| (mb_stripos($os, 'ubuntu') !== false);
 		}
 

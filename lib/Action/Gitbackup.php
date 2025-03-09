@@ -58,7 +58,8 @@ final class Gitbackup extends Base
 				chdir($path);
 				Shell::runGetContent('git pull', $resultGitPull);
 
-				if (mb_strpos($resultGitPull, 'Already up to date') !== false)
+				if ((mb_strpos($resultGitPull, 'Already up to date') !== false)
+					|| (mb_strpos($resultGitPull, 'Уже актуально') !== false))
 				{
 					if (file_exists($archivePath))
 					{

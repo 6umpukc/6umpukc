@@ -23,7 +23,8 @@ final class Win
 			return;
 		}
 
-		$args = '"' . implode('" "', $arguments) . '"';
+		//$args = '"' . implode('" "', $arguments) . '"';
+		$args = "'" . implode("' '", $arguments) . "'";
 		$cmd = 'cscript.exe ' . $args;
 		$cmd = str_replace('&', '^&', $cmd);
 

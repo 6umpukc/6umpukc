@@ -28,13 +28,15 @@ class Base
 		$this->params = $params;
 
 		$this->git = new Git($this->siteRootPath, [
-			'SOLUTION_GIT_REPOS' => $_SERVER['SOLUTION_GIT_REPOS'],
+			'SOLUTION_GIT_REPOS' => $_SERVER['SOLUTION_GIT_REPOS'] ?? '',
 		]);
 	}
 
 	public function getName()
 	{
-		return mb_strtolower(array_pop(explode('\\', static::class)));
+		$chunks = explode('\\', static::class);
+
+		return mb_strtolower(array_pop($chunks));
 	}
 
 	public function getDescription()

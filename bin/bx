@@ -25,66 +25,17 @@ use Data::Dumper;
 
 # common functions
 
-sub init_php_urls {
-	my $phpVersion = '8.4.2';
+sub get_env_path {
+	my $path = shift;
+	my $envPrefix = shift;
 
-	$ENV{'PHP_URLS_WIN32'} = "https://windows.php.net/downloads/releases/php-$phpVersion-Win32-vs17-x86.zip";
-	$ENV{'PHP_URLS_WIN64'} = "https://windows.php.net/downloads/releases/php-$phpVersion-Win32-vs17-x64.zip";
-	$ENV{'PHP_URLS_MACOS'} = '';
-	$ENV{'PHP_URLS_LINUX'} = '';
-}
-
-sub init_node20_urls {
-	my $nodeVersion20 = 'v20.18.1';
-
-	$ENV{'NODE_URLS_WIN32'} = "https://nodejs.org/dist/$nodeVersion20/node-$nodeVersion20-win-x86.zip";
-	$ENV{'NODE_URLS_WIN64'} = "https://nodejs.org/dist/$nodeVersion20/node-$nodeVersion20-win-x64.zip";
-	$ENV{'NODE_URLS_MACOS'} = "https://nodejs.org/dist/$nodeVersion20/node-$nodeVersion20-darwin-x64.tar.gz";
-	$ENV{'NODE_URLS_LINUX'} = "https://nodejs.org/dist/$nodeVersion20/node-$nodeVersion20-linux-x64.tar.gz";
-}
-
-sub init_node14_urls {
-	my $nodeVersion14 = 'v14.21.3';
-
-	$ENV{'NODE14_URLS_WIN32'} = "https://nodejs.org/dist/$nodeVersion14/node-$nodeVersion14-win-x86.zip";
-	$ENV{'NODE14_URLS_WIN64'} = "https://nodejs.org/dist/$nodeVersion14/node-$nodeVersion14-win-x64.zip";
-	$ENV{'NODE14_URLS_MACOS'} = "https://nodejs.org/dist/$nodeVersion14/node-$nodeVersion14-darwin-x64.tar.gz";
-	$ENV{'NODE14_URLS_LINUX'} = "https://nodejs.org/dist/$nodeVersion14/node-$nodeVersion14-linux-x64.tar.gz";
-}
-
-sub init_bitrix_src_urls {
-	my $baseUrl = 'https://www.1c-bitrix.ru/download/';
-
-	$ENV{'BITRIX_SRC_MICRO'} = $baseUrl . 'start_encode_php5.tar.gz';
-	$ENV{'BITRIX_SRC_CORE'} = $baseUrl . 'start_encode_php5.tar.gz';
-	$ENV{'BITRIX_SRC_START'} = $baseUrl . 'start_encode_php5.tar.gz';
-	$ENV{'BITRIX_SRC_BUSINESS'} = $baseUrl . 'business_encode_php5.tar.gz';
-	$ENV{'BITRIX_SRC_CRM'} = $baseUrl . 'portal/bitrix24_encode_php5.tar.gz';
-	$ENV{'BITRIX_SRC_SETUP'} = $baseUrl . 'scripts/bitrixsetup.php';
-	$ENV{'BITRIX_SRC_RESTORE'} = $baseUrl . 'scripts/restore.php';
-	$ENV{'BITRIX_SRC_TEST'} = $baseUrl . 'scripts/bitrix_server_test.php';
-}
-
-sub init_default_env {
-	init_php_urls();
-	init_node20_urls();
-	init_node14_urls();
-	init_bitrix_src_urls();
-
-	$ENV{'BX_MKCERT'} = 'bx.local *.bx.local';
-
-	#$ENV{'DIR_PUBLIC'} = '/public/';
-	$ENV{'DIR_PUBLIC'} = '/';
-
-	#$ENV{'SITE_DIR_USER'} = 'www-data:www-data';
-	$ENV{'SITE_DIR_RIGHTS'} = '0775';
-
-	$ENV{'DIR_LOCAL_SITES'} = $ENV{'HOME'} . '/Local Sites/';
+	return $path . '/.vscode/.env'
+		. (defined $envPrefix? ('.' . $envPrefix) : '');
 }
 
 sub is_site_env {
 	my $path = shift;
-	my $configContent = X::File::get($path . '/.env');
+	my $configContent = X::File::get(get_env_path($path));
 
 	if ((index($configContent, 'APP_URL=') >= 0)
 			|| (index($configContent, 'SOLUTION_GIT_REPOS=') >= 0)) {
@@ -104,7 +55,7 @@ sub detect_site_root {
 	if ($path eq '') {
 		$path = exists $ENV{'PWD'}? $ENV{'PWD'} : getcwd();
 	}
-	if (-f "$path/.env") {
+	if (-f get_env_path($path)) {
 		if ($checkVars) {
 			if (is_site_env($path)) {
 				return $path;
@@ -716,7 +667,7 @@ sub install_php {
 	);
 
 	# patch configs
-	my $phpContent = X::File::get(dirname($RealBin) . '/.template/bitrix.php.ini');
+	my $phpContent = get_template('bitrix.php.ini');
 	my @phpDirs = glob('/etc/php/*');
 	my @tmp = map { basename($_) } sort { $b cmp $a } @phpDirs;
 
@@ -1459,7 +1410,7 @@ sub setup_mysql {
 	say '# Mysql config check...';
 	sudo('mysqladmin -p -u root version');
 
-	my $mysqlContent = X::File::get(dirname($RealBin) . '/.template/ubuntu/bitrix.my.cnf');
+	my $mysqlContent = get_template('ubuntu/bitrix.my.cnf');
 	sudo_patch_file('/etc/mysql/my.cnf', $mysqlContent);
 }
 
@@ -1471,7 +1422,7 @@ sub setup_mail {
 
 	sudo('apt install msmtp');
 
-	copy(dirname($RealBin) . '/.template/.msmtprc', $homePath . '/.msmtprc');
+	copy(get_template_path('.msmtprc'), $homePath . '/.msmtprc');
 	sudo('chown www-data:www-data ' . $homePath . '/.msmtprc');
 	sudo('chmod 0600 ' . $homePath . '/.msmtprc');
 
@@ -1590,22 +1541,104 @@ sub action_fetch_scripts {
 	system('bx fetch test');
 }
 
+sub get_template_path {
+	my $path = shift;
+
+	return dirname($RealBin) . '/.template/' . $path;
+}
+
+sub get_template {
+	my $path = shift;
+
+	return X::File::get(get_template_path($path));
+}
+
+sub init_sftp_vscode {
+	my $basePath = shift;
+
+	my $config = get_template('.vscode/sftp.json');
+
+	my $server = defined($ENV{'DEPLOY_SERVER'})? $ENV{'DEPLOY_SERVER'} : '';
+	my $user = defined($ENV{'DEPLOY_USER'})? $ENV{'DEPLOY_USER'} : '';
+	my $password = defined($ENV{'DEPLOY_PASSWORD'})? $ENV{'DEPLOY_PASSWORD'} : '';
+	my $port = defined($ENV{'DEPLOY_PORT'}) && $ENV{'DEPLOY_PORT'}? $ENV{'DEPLOY_PORT'} : '22';
+	my $path = defined($ENV{'DEPLOY_PATH'})? $ENV{'DEPLOY_PATH'} : '';
+	my $privateKeyPath = defined($ENV{'DEPLOY_PRIVATEKEYPATH'})? $ENV{'DEPLOY_PRIVATEKEYPATH'} : '';
+
+	$config =~ s/sftphost/$server/g;
+	$config =~ s/sftpusername/$user/g;
+	$config =~ s/sftppassword/$password/g;
+	$config =~ s/sftpport/$port/g;
+	$config =~ s/sftpremotePath/$path/g;
+	$config =~ s/sftpprivateKeyPath/$privateKeyPath/g;
+
+	$config =~ s/"password"\:\s+""\,//g;
+	$config =~ s/"privateKeyPath"\:\s+""\,//g;
+
+	X::File::put($basePath . '/.vscode/sftp.json', $config);
+}
+
+sub action_env_set {
+	my $basePath = shift;
+	require_site_root($basePath);
+
+	my $envPrefix = defined $ARGV[1]? $ARGV[1] : '';
+	if ($envPrefix eq '') {
+		# установить окружение по умолчанию
+		unlink(get_env_path($basePath, 'local'));
+	} else {
+		my $envPathFrom = get_env_path($basePath, $envPrefix);
+		my $envPathTo = get_env_path($basePath, 'local');
+		require_file($envPathFrom, 'ENV');
+
+		if ($envPrefix eq 'prod') {
+			if (!confirm_continue('Switch to .env.prod settings?')) {
+				return;
+			}
+		}
+
+		if (-f $envPathFrom) {
+			if (-f $envPathTo) {
+				unlink($envPathTo);
+			}
+			symlink($envPathFrom, $envPathTo);
+		}
+	}
+
+	load_config();
+	init_sftp_vscode($basePath);
+}
+
+sub get_env_current {
+	my $basePath = shift;
+	my $currentEnvPath = abs_path(get_env_path($basePath, 'local'));
+	my $name = basename($currentEnvPath);
+	my $currentEnvPrefix = (split(/\./, $name))[-1];
+
+	if (! -f $currentEnvPath) {
+		return 'default';
+	}
+
+	return (defined $ENV{'BX_ENV'}? $ENV{'BX_ENV'} : $currentEnvPrefix);
+}
+
 sub action_env {
 	my $basePath = shift;
 	require_site_root($basePath);
 
+	my $envPrefix = get_env_current($basePath);
 	our %config;
 	say "Site root:\n\t$basePath\n";
 
 	my $ftp = ftp_conn_str();
 	if ($ftp ne '') {
-		say "FTP:\n\t" . ftp_conn_str();
+		say "FTP [" . $envPrefix . "]:\n\t" . ftp_conn_str();
 		say '';
 	}
 
 	my $connStr = get_ssh_command();
 	if ($connStr ne '') {
-		say 'SSH:';
+		say 'SSH [' . $envPrefix . ']:';
 		say "\t" . $connStr;
 		say "\t" . ssh_exec_remote();
 		say '';
@@ -1619,7 +1652,7 @@ sub action_env {
 		say '';
 	}
 
-	say 'ENV config:';
+	say 'ENV [' . $envPrefix . '] config:';
 	for my $k (sort (keys %config)) {
 		my $value = $ENV{$k};
 
@@ -1702,6 +1735,41 @@ sub action_solution_links {
 	}
 }
 
+sub load_config {
+	our $site_root;
+
+	# env common params from bx tool path
+	our %config = load_env($RealBin . '/.env');
+
+	# env common params from site
+	my %configSite = load_env(get_env_path($site_root));
+	for my $k (keys %configSite) {
+		$config{$k} = $configSite{$k};
+	}
+
+	# env params from site BX_ENV
+	my $envPrefix = '';
+	if (exists $ENV{'BX_ENV'}) {
+		# окружение заданое в переменной BX_ENV
+		$envPrefix = $ENV{'BX_ENV'};
+	} else {
+		# окружение по умолчанию .env.local
+		$envPrefix = 'local';
+		if (!-f get_env_path($site_root, $envPrefix)) {
+			$envPrefix = '';
+		}
+	}
+
+	if ($envPrefix ne '') {
+		my $envFname = get_env_path($site_root, $envPrefix);
+		require_file($envFname, 'ENV');
+		my %configBxEnv = load_env($envFname);
+		for my $k (keys %configBxEnv) {
+			$config{$k} = $configBxEnv{$k};
+		}
+	}
+}
+
 # main
 
 our $site_root = detect_site_root('');
@@ -1710,30 +1778,8 @@ if ($site_root eq '') {
 }
 
 # load params
-init_default_env();
-
-# env params from bx path
-our %config = load_env($RealBin . '/.env');
-
-# env params from site
-my %configSite = load_env($site_root . '/.env');
-for my $k (keys %configSite) {
-	$config{$k} = $configSite{$k};
-}
-
-# env params from site BX_ENV
-my $envPrefix = '';
-if (exists $ENV{'BX_ENV'}) {
-	$envPrefix = $ENV{'BX_ENV'};
-}
-if ($envPrefix ne '') {
-	my $envFname = $site_root . '/.env.' . $envPrefix;
-	require_file($envFname, 'ENV');
-	my %configBxEnv = load_env($envFname);
-	for my $k (keys %configBxEnv) {
-		$config{$k} = $configBxEnv{$k};
-	}
-}
+X::Config::init_default_env();
+load_config();
 
 # process commands
 my %actions = (
@@ -1767,6 +1813,10 @@ my %actions = (
 
 	'env' => {
 		'fn' => \&action_env,
+	},
+
+	'env-set' => {
+		'fn' => \&action_env_set,
 	},
 
 	'ftp' => {
@@ -1815,61 +1865,124 @@ if ($action ne '') {
 
 # --- packages
 
+package X::Config;
+
+	use 5.016;
+	use warnings;
+
+	sub init_php_urls {
+		my $phpVersion = '8.4.2';
+
+		$ENV{'PHP_URLS_WIN32'} = "https://windows.php.net/downloads/releases/php-$phpVersion-Win32-vs17-x86.zip";
+		$ENV{'PHP_URLS_WIN64'} = "https://windows.php.net/downloads/releases/php-$phpVersion-Win32-vs17-x64.zip";
+		$ENV{'PHP_URLS_MACOS'} = '';
+		$ENV{'PHP_URLS_LINUX'} = '';
+	}
+
+	sub init_node20_urls {
+		my $nodeVersion20 = 'v20.18.1';
+
+		$ENV{'NODE_URLS_WIN32'} = "https://nodejs.org/dist/$nodeVersion20/node-$nodeVersion20-win-x86.zip";
+		$ENV{'NODE_URLS_WIN64'} = "https://nodejs.org/dist/$nodeVersion20/node-$nodeVersion20-win-x64.zip";
+		$ENV{'NODE_URLS_MACOS'} = "https://nodejs.org/dist/$nodeVersion20/node-$nodeVersion20-darwin-x64.tar.gz";
+		$ENV{'NODE_URLS_LINUX'} = "https://nodejs.org/dist/$nodeVersion20/node-$nodeVersion20-linux-x64.tar.gz";
+	}
+
+	sub init_node14_urls {
+		my $nodeVersion14 = 'v14.21.3';
+
+		$ENV{'NODE14_URLS_WIN32'} = "https://nodejs.org/dist/$nodeVersion14/node-$nodeVersion14-win-x86.zip";
+		$ENV{'NODE14_URLS_WIN64'} = "https://nodejs.org/dist/$nodeVersion14/node-$nodeVersion14-win-x64.zip";
+		$ENV{'NODE14_URLS_MACOS'} = "https://nodejs.org/dist/$nodeVersion14/node-$nodeVersion14-darwin-x64.tar.gz";
+		$ENV{'NODE14_URLS_LINUX'} = "https://nodejs.org/dist/$nodeVersion14/node-$nodeVersion14-linux-x64.tar.gz";
+	}
+
+	sub init_bitrix_src_urls {
+		my $baseUrl = 'https://www.1c-bitrix.ru/download/';
+
+		$ENV{'BITRIX_SRC_MICRO'} = $baseUrl . 'start_encode_php5.tar.gz';
+		$ENV{'BITRIX_SRC_CORE'} = $baseUrl . 'start_encode_php5.tar.gz';
+		$ENV{'BITRIX_SRC_START'} = $baseUrl . 'start_encode_php5.tar.gz';
+		$ENV{'BITRIX_SRC_BUSINESS'} = $baseUrl . 'business_encode_php5.tar.gz';
+		$ENV{'BITRIX_SRC_CRM'} = $baseUrl . 'portal/bitrix24_encode_php5.tar.gz';
+		$ENV{'BITRIX_SRC_SETUP'} = $baseUrl . 'scripts/bitrixsetup.php';
+		$ENV{'BITRIX_SRC_RESTORE'} = $baseUrl . 'scripts/restore.php';
+		$ENV{'BITRIX_SRC_TEST'} = $baseUrl . 'scripts/bitrix_server_test.php';
+	}
+
+	sub init_default_env {
+		init_php_urls();
+		init_node20_urls();
+		init_node14_urls();
+		init_bitrix_src_urls();
+
+		$ENV{'BX_MKCERT'} = 'bx.local *.bx.local';
+
+		#$ENV{'DIR_PUBLIC'} = '/public/';
+		$ENV{'DIR_PUBLIC'} = '/';
+
+		#$ENV{'SITE_DIR_USER'} = 'www-data:www-data';
+		$ENV{'SITE_DIR_RIGHTS'} = '0775';
+
+		$ENV{'DIR_LOCAL_SITES'} = $ENV{'HOME'} . '/Local Sites/';
+	}
+1;
+
 package X::File;
 
-use 5.016;
-use warnings;
+	use 5.016;
+	use warnings;
 
-#use Exporter qw(import);
+	#use Exporter qw(import);
 
-sub get {
-    my $filename = shift;
-    my $result = '';
-    if (open(my $fh, '<:encoding(UTF-8)', $filename)) {
-        while (my $line = <$fh>) {
-            $result .= $line;
-        }
-    }
-    return $result;
-}
+	sub get {
+		my $filename = shift;
+		my $result = '';
+		if (open(my $fh, '<:encoding(UTF-8)', $filename)) {
+			while (my $line = <$fh>) {
+				$result .= $line;
+			}
+		}
+		return $result;
+	}
 
-sub put {
-    my $filename = shift;
-    my $content = shift;
-    if (open(my $fh, '>:encoding(UTF-8)', $filename)) {
-        print $fh $content;
-        close $fh;
-        return 1;
-    }
-    return 0;
-}
+	sub put {
+		my $filename = shift;
+		my $content = shift;
+		if (open(my $fh, '>:encoding(UTF-8)', $filename)) {
+			print $fh $content;
+			close $fh;
+			return 1;
+		}
+		return 0;
+	}
 
-sub get_win {
-	my $filename = shift;
-    my $result = '';
-    if (open(my $fh, '<:encoding(Windows-1251)', $filename)) {
-        while (my $line = <$fh>) {
-            $result .= $line;
-        }
-    }
-    return $result;
-}
+	sub get_win {
+		my $filename = shift;
+		my $result = '';
+		if (open(my $fh, '<:encoding(Windows-1251)', $filename)) {
+			while (my $line = <$fh>) {
+				$result .= $line;
+			}
+		}
+		return $result;
+	}
 
-sub put_win {
-	my $filename = shift;
-    my $content = shift;
-    if (open(my $fh, '>:encoding(Windows-1251)', $filename)) {
-        print $fh $content;
-        close $fh;
-        return 1;
-    }
-    return 0;
-}
+	sub put_win {
+		my $filename = shift;
+		my $content = shift;
+		if (open(my $fh, '>:encoding(Windows-1251)', $filename)) {
+			print $fh $content;
+			close $fh;
+			return 1;
+		}
+		return 0;
+	}
 
-#our @EXPORT = qw(
-#	file_get_contents
-#	file_put_contents
-#	file_get_contents_win
-#	file_put_contents_win
-#);
-#1;
+	#our @EXPORT = qw(
+	#	file_get_contents
+	#	file_put_contents
+	#	file_get_contents_win
+	#	file_put_contents_win
+	#);
+1;

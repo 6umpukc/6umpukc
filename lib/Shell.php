@@ -179,7 +179,7 @@ final class Shell
 
 	public static function getDisplayEnvVariable($varName, $multicolumn = false)
 	{
-		$value = $_SERVER[$varName];
+		$value = $_SERVER[$varName] ?? '';
 
 		$result = array_map(
 			fn ($v) => static::getReplacedEnvVariables(trim($v)),

@@ -22,9 +22,10 @@ final class Vpn extends Base
 		$host = $_SERVER['VPN_HOST'];
 		$username = $_SERVER['VPN_USER'];
 		$password = $_SERVER['VPN_PASSWORD'];
+		$vpnClient = $_SERVER['VPN_CLIENT'] ?? 'cisco';
 
 		$home = Shell\Win::getEnvVariable('USERPROFILE');
-		$script = $home . '/bin/bx_cisco_autologin.js';
+		$script = $home . '/bin/bx_' . basename($vpnClient) . '_autologin.js';
 
 		Shell\Win::cscript([
 			$script,

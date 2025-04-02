@@ -26,10 +26,6 @@ final class Vpn extends Base
 
 		$home = Shell\Win::getEnvVariable('USERPROFILE');
 		$script = $home . '/bin/bx_' . basename($vpnClient) . '_autologin.js';
-		if (!file_exists($script))
-		{
-			return;
-		}
 
 		Shell\Win::cscript([
 			$script,

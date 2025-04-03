@@ -28,7 +28,7 @@ class Base
 		$this->params = $params;
 
 		$this->git = new Git($this->siteRootPath, [
-			'SOLUTION_GIT_REPOS' => $_SERVER['SOLUTION_GIT_REPOS'],
+			'SOLUTION_GIT_REPOS' => $_SERVER['SOLUTION_GIT_REPOS'] ?? '',
 		]);
 	}
 

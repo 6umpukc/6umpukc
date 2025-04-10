@@ -12,30 +12,32 @@ use File::Find qw(finddepth find);
 use Config;
 use Data::Dumper;
 
-#use lib "$RealBin/vendor/lib/perl5";
-#use Text::CSV;
-
 #use lib '.';
-#use Files qw(
-#	file_get_contents
-#	file_put_contents
-#	file_get_contents_win
-#	file_put_contents_win
-#);
+use lib "$RealBin/vendor/lib/perl5";
+use X::Utils;
+
+use X::Config qw(
+	init_default_env
+	get_env_path
+	load_env
+	load_config
+	get_config
+);
+
+use X::File qw(
+	file_get_contents
+	file_put_contents
+	file_get_contents_win
+	file_put_contents_win
+);
+
+#use Text::CSV;
 
 # common functions
 
-sub get_env_path {
-	my $path = shift;
-	my $envPrefix = shift;
-
-	return $path . '/.vscode/.env'
-		. (defined $envPrefix? ('.' . $envPrefix) : '');
-}
-
 sub is_site_env {
 	my $path = shift;
-	my $configContent = X::File::get(get_env_path($path));
+	my $configContent = file_get_contents(get_env_path($path));
 
 	if ((index($configContent, 'APP_URL=') >= 0)
 			|| (index($configContent, 'SOLUTION_GIT_REPOS=') >= 0)) {
@@ -83,70 +85,6 @@ sub get_env {
 	return $result;
 }
 
-sub load_env {
-	my $path = shift;
-	my $disableSetEnv = shift;
-
-	if (!-f $path) {
-		return;
-	}
-	my %result = ();
-
-	my $isMultiline = 0;
-	my @lines = split("\n", X::File::get($path));
-	my $key = '';
-	my $value = '';
-	for my $line (@lines)
-	{
-		if ($isMultiline) {
-			$value .= "\n" . $line;
-
-			my $testLine = unquote($line);
-			if ((index($testLine, "'") >= 0) || (index($testLine, '"') >= 0)) {
-				$isMultiline = 0;
-				$value = trim(unquote(trim($value)));
-				$result{$key} = $value;
-				if (!defined $disableSetEnv) {
-					$ENV{$key} = $value;
-				}
-				$key = '';
-				$value = '';
-			}
-
-			next;
-		}
-
-		$line = trim($line);
-		my $p = index($line, '=');
-		if ($p < 0) {
-			next;
-		}
-
-		my @row = (substr($line, 0, $p), substr($line, $p + 1));
-		$key = $row[0];
-		if ($key eq '') {
-			next;
-		}
-		if (substr($key, 0, 1) eq '#') {
-			next;
-		}
-
-		$value = unquote($row[1]);
-
-		if ((index($value, "'") >= 0) || (index($value, '"') >= 0)) {
-			$isMultiline = 1;
-			next;
-		}
-
-		$result{$key} = $value;
-		if (!defined $disableSetEnv) {
-			$ENV{$key} = $value;
-		}
-	}
-
-	return %result;
-}
-
 sub is_mingw {
     my $msystem = exists $ENV{'MSYSTEM'} ? $ENV{'MSYSTEM'} : '';
 	if (($msystem eq 'MINGW64')
@@ -161,25 +99,6 @@ sub is_windows_32bit {
 	return (index($ENV{'PROCESSOR_ARCHITECTURE'}, 'x86') >= 0)? 1 : 0;
 }
 
-sub trim {
-    my $s = shift;
-    $s =~ s/^\s+|\s+$//g;
-    return $s;
-}
-
-sub unquote {
-	my $s = shift;
-	my $start = substr($s, 0, 1);
-	my $end = substr($s, -1, 1);
-	while ((length($s) > 1) && ($start eq $end) && (($start eq '"') || ($start eq "'")))
-	{
-		$s = substr($s, 1, -1);
-		$start = substr($s, 0, 1);
-		$end = substr($s, -1, 1);
-	}
-	return $s;
-}
-
 sub is_wsl {
 	return ((exists $ENV{'IS_WSL'})
 		|| (exists $ENV{'WSL_DISTRO_NAME'}));
@@ -190,14 +109,14 @@ sub confirm_continue {
     print $title . " Type 'yes' to continue: ";
     my $line = <STDIN>;
     chomp $line;
-    return trim($line) eq 'yes';
+    return X::Utils::trim($line) eq 'yes';
 }
 
 sub check_command {
 	my $cmd = shift;
 	my $test = 'which ' . $cmd;
 	my $res = qx($test);
-	my $path = trim($res);
+	my $path = X::Utils::trim($res);
 	if (index($path, '/mnt/c/') >= 0) {
 		if (is_wsl()) {
 			# skip windows executable from WSL
@@ -215,14 +134,6 @@ sub require_command {
     my $cmd = shift;
     if (!check_command($cmd)) {
         die('[' . $cmd . '] command - not found.');
-    }
-}
-
-sub require_file {
-    my $fname = shift;
-	my $info = shift || '';
-    if (!-f $fname) {
-        die($info . ' [' . $fname . '] file - not found.');
     }
 }
 
@@ -317,7 +228,7 @@ sub run {
 		$sudo = '';
 	}
 
-	$cmd = trim($sudo . ' ' . $cmd);
+	$cmd = X::Utils::trim($sudo . ' ' . $cmd);
 
 	if (!defined($disableDebug) || ($disableDebug == 0)) {
 		if (is_bx_debug()) {
@@ -352,13 +263,13 @@ sub patch_file {
 	my $fixContent = shift;
 
 	if (-f $fname) {
-		my $originalContent = X::File::get($fname);
+		my $originalContent = file_get_contents($fname);
 		if (index($originalContent, $fixContent) < 0) {
-			X::File::put($fname, $originalContent . "\n" . $fixContent . "\n");
+			file_put_contents($fname, $originalContent . "\n" . $fixContent . "\n");
 		}
 	}
 	else {
-		X::File::put($fname, "\n" . $fixContent . "\n");
+		file_put_contents($fname, "\n" . $fixContent . "\n");
 	}
 }
 
@@ -371,10 +282,10 @@ sub sudo_patch_file {
 	}
 	my $path = $ENV{'HOME'};
 	my $tmp = $path . '/.patch.' . basename($fname) . '.tmp';
-	my $originalContent = X::File::get($fname);
+	my $originalContent = file_get_contents($fname);
 	if (index($originalContent, $content) < 0) {
 		$content = $originalContent . "\n" . $content . "\n";
-		X::File::put($tmp, $content);
+		file_get_contents($tmp, $content);
 		sudo("mv '" . $tmp . "' " . $fname);
 	}
 }
@@ -388,10 +299,10 @@ sub replace_var_file {
 		return;
 	}
 
-	my $content = X::File::get($fname);
+	my $content = file_get_contents($fname);
 	if ($content =~ /$name\=".+?"/) {
 		$content =~ s/$name\=".+?"/$name="$value"/;
-		X::File::put($fname, $content);
+		file_get_contents($fname, $content);
 	}
 }
 
@@ -564,7 +475,7 @@ sub get_site_config {
 
 sub require_site_config {
 	my $sitehost = shift;
-	require_file(
+	X::File::require_file(
 		get_site_config($sitehost),
 		"Config for site $sitehost not exists."
 	);
@@ -930,23 +841,23 @@ sub get_map_repos {
 
 	my @lines = split(/\n/, $ENV{'SOLUTION_GIT_REPOS'});
 	for my $line (@lines) {
-		$line = trim($line);
+		$line = X::Utils::trim($line);
 		if ($line eq '') {
 			next;
 		}
 
 		my @tmp = split(';', $line);
-		my $url = trim($tmp[0]);
+		my $url = X::Utils::trim($tmp[0]);
 		my $moduleId = basename($url, '.git');
 		my $pathModules = $basePath . '/bitrix/modules/';
 
 		my $colNum = scalar(@tmp);
-		my $branch = ($colNum > 1)? trim($tmp[1]) : 'master';
-		my $path = ($colNum > 2)? trim($tmp[2]) : '';
+		my $branch = ($colNum > 1)? X::Utils::trim($tmp[1]) : 'master';
+		my $path = ($colNum > 2)? X::Utils::trim($tmp[2]) : '';
 		if ($path eq '') {
 			$path = $pathModules . $moduleId;
 		}
-		my $page = ($colNum > 3) ? trim($tmp[3]) : '';
+		my $page = ($colNum > 3) ? X::Utils::trim($tmp[3]) : '';
 
 		push @result, {
 			'moduleId' => $moduleId,
@@ -1550,7 +1461,7 @@ sub get_template_path {
 sub get_template {
 	my $path = shift;
 
-	return X::File::get(get_template_path($path));
+	return file_get_contents(get_template_path($path));
 }
 
 sub init_sftp_vscode {
@@ -1575,12 +1486,14 @@ sub init_sftp_vscode {
 	$config =~ s/"password"\:\s+""\,//g;
 	$config =~ s/"privateKeyPath"\:\s+""\,//g;
 
-	X::File::put($basePath . '/.vscode/sftp.json', $config);
+	file_put_contents($basePath . '/.vscode/sftp.json', $config);
 }
 
 sub action_env_set {
 	my $basePath = shift;
 	require_site_root($basePath);
+
+	our $site_root;
 
 	my $envPrefix = defined $ARGV[1]? $ARGV[1] : '';
 	if ($envPrefix eq '') {
@@ -1589,7 +1502,7 @@ sub action_env_set {
 	} else {
 		my $envPathFrom = get_env_path($basePath, $envPrefix);
 		my $envPathTo = get_env_path($basePath, 'local');
-		require_file($envPathFrom, 'ENV');
+		X::File::require_file($envPathFrom, 'ENV');
 
 		if ($envPrefix eq 'prod') {
 			if (!confirm_continue('Switch to .env.prod settings?')) {
@@ -1605,8 +1518,10 @@ sub action_env_set {
 		}
 	}
 
-	load_config();
+	load_config($site_root);
 	init_sftp_vscode($basePath);
+
+	action_env($site_root);
 }
 
 sub get_env_current {
@@ -1627,7 +1542,6 @@ sub action_env {
 	require_site_root($basePath);
 
 	my $envPrefix = get_env_current($basePath);
-	our %config;
 	say "Site root:\n\t$basePath\n";
 
 	my $ftp = ftp_conn_str();
@@ -1652,8 +1566,9 @@ sub action_env {
 		say '';
 	}
 
+	my %localConfig = get_config();
 	say 'ENV [' . $envPrefix . '] config:';
-	for my $k (sort (keys %config)) {
+	for my $k (sort (keys %localConfig)) {
 		my $value = $ENV{$k};
 
 		if (($k eq 'BX_SITE_CONFIG_DEST')
@@ -1735,41 +1650,6 @@ sub action_solution_links {
 	}
 }
 
-sub load_config {
-	our $site_root;
-
-	# env common params from bx tool path
-	our %config = load_env($RealBin . '/.env');
-
-	# env common params from site
-	my %configSite = load_env(get_env_path($site_root));
-	for my $k (keys %configSite) {
-		$config{$k} = $configSite{$k};
-	}
-
-	# env params from site BX_ENV
-	my $envPrefix = '';
-	if (exists $ENV{'BX_ENV'}) {
-		# окружение заданое в переменной BX_ENV
-		$envPrefix = $ENV{'BX_ENV'};
-	} else {
-		# окружение по умолчанию .env.local
-		$envPrefix = 'local';
-		if (!-f get_env_path($site_root, $envPrefix)) {
-			$envPrefix = '';
-		}
-	}
-
-	if ($envPrefix ne '') {
-		my $envFname = get_env_path($site_root, $envPrefix);
-		require_file($envFname, 'ENV');
-		my %configBxEnv = load_env($envFname);
-		for my $k (keys %configBxEnv) {
-			$config{$k} = $configBxEnv{$k};
-		}
-	}
-}
-
 # main
 
 our $site_root = detect_site_root('');
@@ -1778,8 +1658,8 @@ if ($site_root eq '') {
 }
 
 # load params
-X::Config::init_default_env();
-load_config();
+init_default_env();
+load_config($site_root);
 
 # process commands
 my %actions = (
@@ -1862,127 +1742,3 @@ if ($action ne '') {
 		run_php_action(@ARGV);
 	}
 }
-
-# --- packages
-
-package X::Config;
-
-	use 5.016;
-	use warnings;
-
-	sub init_php_urls {
-		my $phpVersion = '8.4.2';
-
-		$ENV{'PHP_URLS_WIN32'} = "https://windows.php.net/downloads/releases/php-$phpVersion-Win32-vs17-x86.zip";
-		$ENV{'PHP_URLS_WIN64'} = "https://windows.php.net/downloads/releases/php-$phpVersion-Win32-vs17-x64.zip";
-		$ENV{'PHP_URLS_MACOS'} = '';
-		$ENV{'PHP_URLS_LINUX'} = '';
-	}
-
-	sub init_node20_urls {
-		my $nodeVersion20 = 'v20.18.1';
-
-		$ENV{'NODE_URLS_WIN32'} = "https://nodejs.org/dist/$nodeVersion20/node-$nodeVersion20-win-x86.zip";
-		$ENV{'NODE_URLS_WIN64'} = "https://nodejs.org/dist/$nodeVersion20/node-$nodeVersion20-win-x64.zip";
-		$ENV{'NODE_URLS_MACOS'} = "https://nodejs.org/dist/$nodeVersion20/node-$nodeVersion20-darwin-x64.tar.gz";
-		$ENV{'NODE_URLS_LINUX'} = "https://nodejs.org/dist/$nodeVersion20/node-$nodeVersion20-linux-x64.tar.gz";
-	}
-
-	sub init_node14_urls {
-		my $nodeVersion14 = 'v14.21.3';
-
-		$ENV{'NODE14_URLS_WIN32'} = "https://nodejs.org/dist/$nodeVersion14/node-$nodeVersion14-win-x86.zip";
-		$ENV{'NODE14_URLS_WIN64'} = "https://nodejs.org/dist/$nodeVersion14/node-$nodeVersion14-win-x64.zip";
-		$ENV{'NODE14_URLS_MACOS'} = "https://nodejs.org/dist/$nodeVersion14/node-$nodeVersion14-darwin-x64.tar.gz";
-		$ENV{'NODE14_URLS_LINUX'} = "https://nodejs.org/dist/$nodeVersion14/node-$nodeVersion14-linux-x64.tar.gz";
-	}
-
-	sub init_bitrix_src_urls {
-		my $baseUrl = 'https://www.1c-bitrix.ru/download/';
-
-		$ENV{'BITRIX_SRC_MICRO'} = $baseUrl . 'start_encode_php5.tar.gz';
-		$ENV{'BITRIX_SRC_CORE'} = $baseUrl . 'start_encode_php5.tar.gz';
-		$ENV{'BITRIX_SRC_START'} = $baseUrl . 'start_encode_php5.tar.gz';
-		$ENV{'BITRIX_SRC_BUSINESS'} = $baseUrl . 'business_encode_php5.tar.gz';
-		$ENV{'BITRIX_SRC_CRM'} = $baseUrl . 'portal/bitrix24_encode_php5.tar.gz';
-		$ENV{'BITRIX_SRC_SETUP'} = $baseUrl . 'scripts/bitrixsetup.php';
-		$ENV{'BITRIX_SRC_RESTORE'} = $baseUrl . 'scripts/restore.php';
-		$ENV{'BITRIX_SRC_TEST'} = $baseUrl . 'scripts/bitrix_server_test.php';
-	}
-
-	sub init_default_env {
-		init_php_urls();
-		init_node20_urls();
-		init_node14_urls();
-		init_bitrix_src_urls();
-
-		$ENV{'BX_MKCERT'} = 'bx.local *.bx.local';
-
-		#$ENV{'DIR_PUBLIC'} = '/public/';
-		$ENV{'DIR_PUBLIC'} = '/';
-
-		#$ENV{'SITE_DIR_USER'} = 'www-data:www-data';
-		$ENV{'SITE_DIR_RIGHTS'} = '0775';
-
-		$ENV{'DIR_LOCAL_SITES'} = $ENV{'HOME'} . '/Local Sites/';
-	}
-1;
-
-package X::File;
-
-	use 5.016;
-	use warnings;
-
-	#use Exporter qw(import);
-
-	sub get {
-		my $filename = shift;
-		my $result = '';
-		if (open(my $fh, '<:encoding(UTF-8)', $filename)) {
-			while (my $line = <$fh>) {
-				$result .= $line;
-			}
-		}
-		return $result;
-	}
-
-	sub put {
-		my $filename = shift;
-		my $content = shift;
-		if (open(my $fh, '>:encoding(UTF-8)', $filename)) {
-			print $fh $content;
-			close $fh;
-			return 1;
-		}
-		return 0;
-	}
-
-	sub get_win {
-		my $filename = shift;
-		my $result = '';
-		if (open(my $fh, '<:encoding(Windows-1251)', $filename)) {
-			while (my $line = <$fh>) {
-				$result .= $line;
-			}
-		}
-		return $result;
-	}
-
-	sub put_win {
-		my $filename = shift;
-		my $content = shift;
-		if (open(my $fh, '>:encoding(Windows-1251)', $filename)) {
-			print $fh $content;
-			close $fh;
-			return 1;
-		}
-		return 0;
-	}
-
-	#our @EXPORT = qw(
-	#	file_get_contents
-	#	file_put_contents
-	#	file_get_contents_win
-	#	file_put_contents_win
-	#);
-1;

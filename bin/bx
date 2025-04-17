@@ -750,6 +750,7 @@ sub is_module_using_extensions {
 		return 0;
 	}
 
+	#TODO!!! добавить параметр "без установки ENV и общей переменной-конфига"
 	my %moduleEnv = load_env($path, 1);
 
 	return exists $moduleEnv{'USING_EXTENSIONS'} && ($moduleEnv{'USING_EXTENSIONS'} eq '1');

@@ -756,6 +756,7 @@ sub is_module_using_extensions {
 	return exists $moduleEnv{'USING_EXTENSIONS'} && ($moduleEnv{'USING_EXTENSIONS'} eq '1');
 }
 
+#NOTE создает символьные ссылки с компонентов, расширений и т. д. модуля на их "установленные папки"
 sub process_module_links {
 	my $basePath = shift;
 	my $modulePath = shift;

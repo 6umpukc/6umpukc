@@ -1652,6 +1652,20 @@ sub action_solution_links {
 	}
 }
 
+sub action_upgrade {
+	say '';
+	say 'Update from apt ...';
+	say '';
+	system('sudo apt update');
+	system('sudo apt upgrade');
+	system('sudo apt autoremove');
+
+	say '';
+	say 'Update from snap ...';
+	say '';
+	system('sudo snap refresh');
+}
+
 # main
 
 our $site_root = detect_site_root('');
@@ -1683,6 +1697,10 @@ my %actions = (
 
 	'install-mkcert' => {
 		'fn' => \&action_install_mkcert,
+	},
+
+	'upgrade' => {
+		'fn' => \&action_upgrade,
 	},
 
 	'fetch' => {

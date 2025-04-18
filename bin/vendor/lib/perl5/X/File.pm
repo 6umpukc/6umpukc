@@ -77,6 +77,7 @@ our @EXPORT = qw(
 	file_get_contents_win
 	file_put_contents
 	file_put_contents_win
+	require_file
 );
 
 1;

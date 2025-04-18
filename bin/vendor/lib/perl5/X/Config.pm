@@ -5,9 +5,11 @@ use 5.016;
 use warnings;
 use FindBin qw($RealBin $Bin $Script);
 use Cwd qw(cwd getcwd abs_path);
+use File::Basename;
 use base 'Exporter';
 
-use X::File qw(file_get_contents);
+use X::File qw(file_get_contents require_file);
+use X::Utils qw(trim unquote);
 
 sub init_php_urls {
 	my $phpVersion = '8.4.2';
@@ -84,6 +86,19 @@ sub get_env_path {
 		. (defined $envPrefix? ('.' . $envPrefix) : '');
 }
 
+sub get_env_current {
+	my $basePath = shift;
+	my $currentEnvPath = abs_path(get_env_path($basePath, 'local'));
+	my $name = basename($currentEnvPath);
+	my $currentEnvPrefix = (split(/\./, $name))[-1];
+
+	if (! -f $currentEnvPath) {
+		return 'default';
+	}
+
+	return (defined $ENV{'BX_ENV'}? $ENV{'BX_ENV'} : $currentEnvPrefix);
+}
+
 sub load_env {
 	my $path = shift;
 	my $disableSetEnv = shift;
@@ -102,10 +117,10 @@ sub load_env {
 		if ($isMultiline) {
 			$value .= "\n" . $line;
 
-			my $testLine = X::Utils::unquote($line);
+			my $testLine = unquote($line);
 			if ((index($testLine, "'") >= 0) || (index($testLine, '"') >= 0)) {
 				$isMultiline = 0;
-				$value = X::Utils::trim(X::Utils::unquote(X::Utils::trim($value)));
+				$value = trim(unquote(trim($value)));
 				$result{$key} = $value;
 				if (!defined $disableSetEnv) {
 					$ENV{$key} = $value;
@@ -117,7 +132,7 @@ sub load_env {
 			next;
 		}
 
-		$line = X::Utils::trim($line);
+		$line = trim($line);
 		my $p = index($line, '=');
 		if ($p < 0) {
 			next;
@@ -132,7 +147,7 @@ sub load_env {
 			next;
 		}
 
-		$value = X::Utils::unquote($row[1]);
+		$value = unquote($row[1]);
 
 		if ((index($value, "'") >= 0) || (index($value, '"') >= 0)) {
 			$isMultiline = 1;
@@ -176,7 +191,7 @@ sub load_config {
 
 	if ($envPrefix ne '') {
 		my $envFname = get_env_path($site_root, $envPrefix);
-		X::File::require_file($envFname, 'ENV');
+		require_file($envFname, 'ENV');
 		my %configBxEnv = load_env($envFname);
 		for my $k (keys %configBxEnv) {
 			$config{$k} = $configBxEnv{$k};
@@ -193,6 +208,7 @@ sub get_config {
 our @EXPORT = qw(
 	init_default_env
 	get_env_path
+	get_env_current
 	load_env
 	load_config
 	get_config

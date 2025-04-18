@@ -6,7 +6,10 @@ use Throwable;
 
 // php ~/bin/6umpukc/include.php [arg1] [arg2] [arg3]
 
-function initBitrixCli()
+new class
+{
+
+private function initBitrixCli()
 {
 	// автозагрузчик от bitrix используется только при явном указании опции
 	if (empty($_SERVER['BX_USE_BITRIX']))
@@ -33,7 +36,7 @@ function initBitrixCli()
 	return false;
 }
 
-function runCommand($script, $siteRootPath, $params)
+private function runCommand($script, $siteRootPath, $params)
 {
 	$actionName = array_shift($params) ?? '';
 	$originalActionName = $actionName;
@@ -72,7 +75,7 @@ function runCommand($script, $siteRootPath, $params)
 	$action = new $className($script, $siteRootPath, $params, $originalActionName);
 }
 
-function runCli()
+private function runCli()
 {
 	$params = $_SERVER['argv'];
 	$script = array_shift($params);
@@ -84,7 +87,7 @@ function runCli()
 		$_SERVER['DOCUMENT_ROOT'] = dirname(dirname(dirname(__DIR__)));
 	}
 
-	if (initBitrixCli())
+	if ($this->initBitrixCli())
 	{
 		//...
 	}
@@ -104,15 +107,15 @@ function runCli()
 		//...
 	}
 
-	runCommand($script, $siteRootPath, $params);
+	$this->runCommand($script, $siteRootPath, $params);
 }
 
-function main()
+public function __construct()
 {
 	if (php_sapi_name() === 'cli')
 	{
-		runCli();
+		$this->runCli();
 	}
 }
 
-main();
+};

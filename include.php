@@ -43,20 +43,33 @@ function runCommand($script, $siteRootPath, $params)
 		return;
 	}
 
+	// check overrided or custom commands
+	$className = '\\Rodzeta\\Siteoptions\\Action\\Override\\' . ucfirst($actionName);
+	if (class_exists($className))
+	{
+		(new $className(
+			$script,
+			$siteRootPath,
+			$params
+		))->run();
+		return;
+	}
+
+	// check base commands
 	$className = '\\Rodzeta\\Siteoptions\\Action\\' . ucfirst($actionName);
-
-	if (!class_exists($className))
+	if (class_exists($className))
 	{
-		$className = '\\Rodzeta\\Siteoptions\\Wrapper';
-
-		$action = new $className($script, $siteRootPath, $params, $originalActionName);
-	}
-	else
-	{
-		$action = new $className($script, $siteRootPath, $params);
+		(new $className(
+			$script,
+			$siteRootPath,
+			$params
+		))->run();
+		return;
 	}
 
-	$action->run();
+	// wrapper for handling undefined commands
+	$className = '\\Rodzeta\\Siteoptions\\Wrapper';
+	$action = new $className($script, $siteRootPath, $params, $originalActionName);
 }
 
 function runCli()

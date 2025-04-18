@@ -61,34 +61,48 @@ class Base
 	{
 		$result = [];
 
-		foreach (new DirectoryIterator(__DIR__ . '/Action') as $f)
+		foreach ([
+				new DirectoryIterator(__DIR__ . '/Action'),
+				new DirectoryIterator(__DIR__ . '/Action/Override')
+			] as $dirIterator)
 		{
-			if (!$f->isFile())
+			foreach ($dirIterator as $f)
 			{
-				continue;
+				if (!$f->isFile())
+				{
+					continue;
+				}
+				if ($f->getExtension() != 'php')
+				{
+					continue;
+				}
+
+				$originalName = $f->getBasename('.php');
+				$name = mb_strtolower($originalName);
+				if (in_array($name, [
+						'help',
+					]))
+				{
+					continue;
+				}
+
+				$className = __NAMESPACE__ . '\\Action\\Override\\' . $originalName;
+				if (!class_exists($className))
+				{
+					$className = __NAMESPACE__ . '\\Action\\' . $originalName;
+					if (!class_exists($className))
+					{
+						continue;
+					}
+				}
+
+				$action = $this->create($className);
+
+				$result[$action->getName()] = [
+					'class' => $className,
+					'descr' => $action->getDescription(),
+				];
 			}
-
-			$originalName = $f->getBasename('.php');
-			$name = mb_strtolower($originalName);
-			if (in_array($name, [
-					'help',
-				]))
-			{
-				continue;
-			}
-
-			$className = __NAMESPACE__ . '\\Action\\' . $originalName;
-			if (!class_exists($className))
-			{
-				continue;
-			}
-
-			$action = $this->create($className);
-
-			$result[$action->getName()] = [
-				'class' => $className,
-				'descr' => $action->getDescription(),
-			];
 		}
 
 		ksort($result);

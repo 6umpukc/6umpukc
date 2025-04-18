@@ -9,6 +9,6 @@ final class Upgrade extends Base
 {
 	public function getDescription()
 	{
-		return 'bx ' . $this->getName() . ' - Обновление системы.';
+		return 'bx ' . $this->getName() . ' - РћР±РЅРѕРІР»РµРЅРёРµ СЃРёСЃС‚РµРјС‹.';
 	}
 }

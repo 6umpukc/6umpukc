@@ -160,4 +160,9 @@ class Base
 		system("sudo mv $tmp $destpath");
 		system("sudo service apache2 reload");
 	}
+
+	protected function getDevPath($path = '')
+	{
+		return dirname($this->script) . '/.dev/' . $path;
+	}
 }

@@ -3,6 +3,7 @@ package X::Utils;
 
 use 5.016;
 use warnings;
+use base 'Exporter';
 
 sub trim {
 	my $s = shift;
@@ -22,5 +23,10 @@ sub unquote {
 	}
 	return $s;
 }
+
+our @EXPORT = qw(
+	trim
+	unquote
+);
 
 1;

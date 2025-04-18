@@ -14,11 +14,12 @@ use Data::Dumper;
 
 #use lib '.';
 use lib "$RealBin/vendor/lib/perl5";
-use X::Utils;
+use X::Utils qw(trim unquote);
 
 use X::Config qw(
 	init_default_env
 	get_env_path
+	get_env_current
 	load_env
 	load_config
 	get_config
@@ -29,6 +30,7 @@ use X::File qw(
 	file_put_contents
 	file_get_contents_win
 	file_put_contents_win
+	require_file
 );
 
 #use Text::CSV;
@@ -109,14 +111,14 @@ sub confirm_continue {
     print $title . " Type 'yes' to continue: ";
     my $line = <STDIN>;
     chomp $line;
-    return X::Utils::trim($line) eq 'yes';
+    return trim($line) eq 'yes';
 }
 
 sub check_command {
 	my $cmd = shift;
 	my $test = 'which ' . $cmd;
 	my $res = qx($test);
-	my $path = X::Utils::trim($res);
+	my $path = trim($res);
 	if (index($path, '/mnt/c/') >= 0) {
 		if (is_wsl()) {
 			# skip windows executable from WSL
@@ -228,7 +230,7 @@ sub run {
 		$sudo = '';
 	}
 
-	$cmd = X::Utils::trim($sudo . ' ' . $cmd);
+	$cmd = trim($sudo . ' ' . $cmd);
 
 	if (!defined($disableDebug) || ($disableDebug == 0)) {
 		if (is_bx_debug()) {
@@ -475,7 +477,7 @@ sub get_site_config {
 
 sub require_site_config {
 	my $sitehost = shift;
-	X::File::require_file(
+	require_file(
 		get_site_config($sitehost),
 		"Config for site $sitehost not exists."
 	);
@@ -750,7 +752,6 @@ sub is_module_using_extensions {
 		return 0;
 	}
 
-	#TODO!!! добавить параметр "без установки ENV и общей переменной-конфига"
 	my %moduleEnv = load_env($path, 1);
 
 	return exists $moduleEnv{'USING_EXTENSIONS'} && ($moduleEnv{'USING_EXTENSIONS'} eq '1');
@@ -843,23 +844,23 @@ sub get_map_repos {
 
 	my @lines = split(/\n/, $ENV{'SOLUTION_GIT_REPOS'});
 	for my $line (@lines) {
-		$line = X::Utils::trim($line);
+		$line = trim($line);
 		if ($line eq '') {
 			next;
 		}
 
 		my @tmp = split(';', $line);
-		my $url = X::Utils::trim($tmp[0]);
+		my $url = trim($tmp[0]);
 		my $moduleId = basename($url, '.git');
 		my $pathModules = $basePath . '/bitrix/modules/';
 
 		my $colNum = scalar(@tmp);
-		my $branch = ($colNum > 1)? X::Utils::trim($tmp[1]) : 'master';
-		my $path = ($colNum > 2)? X::Utils::trim($tmp[2]) : '';
+		my $branch = ($colNum > 1)? trim($tmp[1]) : 'master';
+		my $path = ($colNum > 2)? trim($tmp[2]) : '';
 		if ($path eq '') {
 			$path = $pathModules . $moduleId;
 		}
-		my $page = ($colNum > 3) ? X::Utils::trim($tmp[3]) : '';
+		my $page = ($colNum > 3) ? trim($tmp[3]) : '';
 
 		push @result, {
 			'moduleId' => $moduleId,
@@ -1384,6 +1385,31 @@ sub action_install {
 	action_install_php();
 }
 
+sub download_by_url {
+	my $srcUrl = shift;
+	my $outputFile = shift;
+
+	say "Loading $srcUrl...";
+	request_get($srcUrl, $outputFile);
+	if (!-f $outputFile) {
+    	die('Error on loading bitrix edition or script ' . $srcUrl);
+  	}
+}
+
+sub download_by_urls {
+	my @urls = @_;
+
+	for my $srcUrl (@urls) {
+		$srcUrl = trim($srcUrl);
+		if ($srcUrl eq '') {
+			next;
+		}
+
+		my $outputFile = dirname($RealBin) . '/.dev/' . basename($srcUrl);
+		download_by_url($srcUrl, $outputFile);
+	}
+}
+
 sub action_fetch {
 	my %urlEditions = (
 		'micro' => $ENV{'BITRIX_SRC_MICRO'},
@@ -1394,6 +1420,7 @@ sub action_fetch {
 		'setup' => $ENV{'BITRIX_SRC_SETUP'},
 		'restore' => $ENV{'BITRIX_SRC_RESTORE'},
 		'test' => $ENV{'BITRIX_SRC_TEST'},
+		'docs' => $ENV{'BITRIX_SRC_DOCS'}
 	);
 
 	my $edition = (scalar @ARGV > 1) ? $ARGV[1] : 'start';
@@ -1412,6 +1439,9 @@ sub action_fetch {
 		$outputFile = 'restore.php';
 	} elsif ($edition eq 'test') {
 		$outputFile = 'bitrix_server_test.php';
+	} elsif ($edition eq 'docs') {
+		download_by_urls(split(/\n/, $urlEditions{$edition}));
+		return;
 	} elsif ($edition eq 'micro') {
 		$extractOptions = './bitrix/modules';
 	}
@@ -1421,12 +1451,7 @@ sub action_fetch {
 	{
 		return;
 	}
-
-	say "Loading $srcUrl...";
-	request_get($srcUrl, $outputFile);
-	if (!-f $outputFile) {
-    	die('Error on loading bitrix edition or script ' . $srcUrl);
-  	}
+	download_by_url($srcUrl, $outputFile);
 
 	if (($edition eq 'setup')
 			or ($edition eq 'restore')
@@ -1504,7 +1529,7 @@ sub action_env_set {
 	} else {
 		my $envPathFrom = get_env_path($basePath, $envPrefix);
 		my $envPathTo = get_env_path($basePath, 'local');
-		X::File::require_file($envPathFrom, 'ENV');
+		require_file($envPathFrom, 'ENV');
 
 		if ($envPrefix eq 'prod') {
 			if (!confirm_continue('Switch to .env.prod settings?')) {
@@ -1524,19 +1549,6 @@ sub action_env_set {
 	init_sftp_vscode($basePath);
 
 	action_env($site_root);
-}
-
-sub get_env_current {
-	my $basePath = shift;
-	my $currentEnvPath = abs_path(get_env_path($basePath, 'local'));
-	my $name = basename($currentEnvPath);
-	my $currentEnvPrefix = (split(/\./, $name))[-1];
-
-	if (! -f $currentEnvPath) {
-		return 'default';
-	}
-
-	return (defined $ENV{'BX_ENV'}? $ENV{'BX_ENV'} : $currentEnvPrefix);
 }
 
 sub action_env {
@@ -1574,6 +1586,7 @@ sub action_env {
 		my $value = $ENV{$k};
 
 		if (($k eq 'BX_SITE_CONFIG_DEST')
+				or ($k eq 'BX_SNIPPETS_SRC')
 				or ($k eq 'BX_SITE_CONFIG_SRC')
 				or ($k eq 'BX_BACKUP_GIT_REPOS_DEST')
 				or ($k eq 'BX_BACKUP_GIT_REPOS')

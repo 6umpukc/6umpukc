@@ -72,7 +72,12 @@ private function runCommand($script, $siteRootPath, $params)
 
 	// wrapper for handling undefined commands
 	$className = '\\Rodzeta\\Siteoptions\\Wrapper';
-	$action = new $className($script, $siteRootPath, $params, $originalActionName);
+	(new $className(
+		$script,
+		$siteRootPath,
+		$params,
+		$originalActionName
+	))->run();
 }
 
 private function runCli()

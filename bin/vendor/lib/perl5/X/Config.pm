@@ -55,6 +55,7 @@ sub init_bitrix_src_urls {
 	$ENV{'BITRIX_SRC_DOCS'} = '
 		https://dev.1c-bitrix.ru/docs/chm_files/bsm_api.chm
 		https://dev.1c-bitrix.ru/docs/chm_files/api_d7.chm
+		https://dev.1c-bitrix.ru/docs/chm_files/bsm_user.chm
 	';
 }
 

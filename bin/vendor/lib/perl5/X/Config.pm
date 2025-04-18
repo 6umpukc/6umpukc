@@ -39,14 +39,23 @@ sub init_node14_urls {
 sub init_bitrix_src_urls {
 	my $baseUrl = 'https://www.1c-bitrix.ru/download/';
 
+	# distributives
 	$ENV{'BITRIX_SRC_MICRO'} = $baseUrl . 'start_encode_php5.tar.gz';
 	$ENV{'BITRIX_SRC_CORE'} = $baseUrl . 'start_encode_php5.tar.gz';
 	$ENV{'BITRIX_SRC_START'} = $baseUrl . 'start_encode_php5.tar.gz';
 	$ENV{'BITRIX_SRC_BUSINESS'} = $baseUrl . 'business_encode_php5.tar.gz';
 	$ENV{'BITRIX_SRC_CRM'} = $baseUrl . 'portal/bitrix24_encode_php5.tar.gz';
+
+	# install scripts
 	$ENV{'BITRIX_SRC_SETUP'} = $baseUrl . 'scripts/bitrixsetup.php';
 	$ENV{'BITRIX_SRC_RESTORE'} = $baseUrl . 'scripts/restore.php';
 	$ENV{'BITRIX_SRC_TEST'} = $baseUrl . 'scripts/bitrix_server_test.php';
+
+	# docs
+	$ENV{'BITRIX_SRC_DOCS'} = '
+		https://dev.1c-bitrix.ru/docs/chm_files/bsm_api.chm
+		https://dev.1c-bitrix.ru/docs/chm_files/api_d7.chm
+	';
 }
 
 sub init_default_env {
@@ -154,10 +163,10 @@ sub load_config {
 	# env params from site BX_ENV
 	my $envPrefix = '';
 	if (exists $ENV{'BX_ENV'}) {
-		# окружение заданое в переменной BX_ENV
+		# РѕРєСЂСѓР¶РµРЅРёРµ Р·Р°РґР°РЅРѕРµ РІ РїРµСЂРµРјРµРЅРЅРѕР№ BX_ENV
 		$envPrefix = $ENV{'BX_ENV'};
 	} else {
-		# окружение по умолчанию .env.local
+		# РѕРєСЂСѓР¶РµРЅРёРµ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ .env.local
 		$envPrefix = 'local';
 		if (!-f get_env_path($site_root, $envPrefix)) {
 			$envPrefix = '';

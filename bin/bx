@@ -750,7 +750,6 @@ sub is_module_using_extensions {
 		return 0;
 	}
 
-	#TODO!!! добавить параметр "без установки ENV и общей переменной-конфига"
 	my %moduleEnv = load_env($path, 1);
 
 	return exists $moduleEnv{'USING_EXTENSIONS'} && ($moduleEnv{'USING_EXTENSIONS'} eq '1');
@@ -1384,6 +1383,31 @@ sub action_install {
 	action_install_php();
 }
 
+sub download_by_url {
+	my $srcUrl = shift;
+	my $outputFile = shift;
+
+	say "Loading $srcUrl...";
+	request_get($srcUrl, $outputFile);
+	if (!-f $outputFile) {
+    	die('Error on loading bitrix edition or script ' . $srcUrl);
+  	}
+}
+
+sub download_by_urls {
+	my @urls = @_;
+
+	for my $srcUrl (@urls) {
+		$srcUrl = X::Utils::trim($srcUrl);
+		if ($srcUrl eq '') {
+			next;
+		}
+
+		my $outputFile = dirname($RealBin) . '/.dev/' . basename($srcUrl);
+		download_by_url($srcUrl, $outputFile);
+	}
+}
+
 sub action_fetch {
 	my %urlEditions = (
 		'micro' => $ENV{'BITRIX_SRC_MICRO'},
@@ -1394,6 +1418,7 @@ sub action_fetch {
 		'setup' => $ENV{'BITRIX_SRC_SETUP'},
 		'restore' => $ENV{'BITRIX_SRC_RESTORE'},
 		'test' => $ENV{'BITRIX_SRC_TEST'},
+		'docs' => $ENV{'BITRIX_SRC_DOCS'}
 	);
 
 	my $edition = (scalar @ARGV > 1) ? $ARGV[1] : 'start';
@@ -1412,6 +1437,9 @@ sub action_fetch {
 		$outputFile = 'restore.php';
 	} elsif ($edition eq 'test') {
 		$outputFile = 'bitrix_server_test.php';
+	} elsif ($edition eq 'docs') {
+		download_by_urls(split(/\n/, $urlEditions{$edition}));
+		return;
 	} elsif ($edition eq 'micro') {
 		$extractOptions = './bitrix/modules';
 	}
@@ -1421,12 +1449,7 @@ sub action_fetch {
 	{
 		return;
 	}
-
-	say "Loading $srcUrl...";
-	request_get($srcUrl, $outputFile);
-	if (!-f $outputFile) {
-    	die('Error on loading bitrix edition or script ' . $srcUrl);
-  	}
+	download_by_url($srcUrl, $outputFile);
 
 	if (($edition eq 'setup')
 			or ($edition eq 'restore')

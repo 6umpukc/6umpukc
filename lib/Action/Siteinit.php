@@ -17,7 +17,9 @@ final class Siteinit extends Base
 
 	public function getDescription()
 	{
-		return 'bx ' . $this->getName() . ' - Создать сайт для проекта (конфиги вебсервера и БД) - выполнять из папки проекта';
+		return 'bx ' . $this->getName()
+			. ' - Создать сайт для проекта (конфиги вебсервера и БД) - выполнять из папки проекта' . "\n"
+			. 'bx ' . $this->getName() . ' [utf]|win';
 	}
 
 	public function addSite($siteconf)
@@ -133,7 +135,7 @@ final class Siteinit extends Base
 	public function run()
 	{
 		$siteExists = (($_SERVER['SITE_ENCODING'] ?? '') != '');
-		$encoding = $this->params[0] ?? 'win'; // win | utf | utflegacy
+		$encoding = $this->params[0] ?? 'utf'; // win | utf | utflegacy
 
 		$this->create(Fixdir::class)->run();
 
@@ -149,22 +151,23 @@ final class Siteinit extends Base
 		{
 			$siteconf = '';
 			$dbconf = '';
-			if ($encoding == 'win')
+			switch ($encoding)
 			{
-				$siteconf = 'win1251site.conf';
-				$dbconf = 'win1251dbcreate.sql';
-			}
-			else if ($encoding == 'utflegacy')
-			{
-				$siteconf = 'utf8legacysite.conf';
-				$dbconf = 'utf8dbcreate.sql';
-				$encoding = 'utf';
-			}
-			else
-			{
-				$siteconf = 'utf8site.conf';
-				$dbconf = 'utf8dbcreate.sql';
-				$encoding = 'utf';
+				case 'win':
+					$siteconf = 'win1251site.conf';
+					$dbconf = 'win1251dbcreate.sql';
+					break;
+
+				case 'utflegacy':
+					$siteconf = 'utf8legacysite.conf';
+					$dbconf = 'utf8dbcreate.sql';
+					$encoding = 'utf';
+					break;
+
+				default:
+					$siteconf = 'utf8site.conf';
+					$dbconf = 'utf8dbcreate.sql';
+					$encoding = 'utf';
 			}
 
 			// init site conf files

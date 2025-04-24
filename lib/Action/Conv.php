@@ -9,8 +9,8 @@ final class Conv extends Base
 {
 	public function getDescription()
 	{
-		return 'bx ' . $this->getName() . ' win|utf . - Конвертирует кодировку в текущей директории' . "\n"
-			. 'bx ' . $this->getName() . ' win|utf - Конвертирует кодировку модулей решения';
+		return 'bx ' . $this->getName() . ' utf|win . - Конвертирует кодировку в текущей директории' . "\n"
+			. 'bx ' . $this->getName() . ' [utf]|win - Конвертирует кодировку модулей решения';
 	}
 
 	protected function processDir($basePath, $encoding, $onlyExtensions = null)
@@ -54,7 +54,7 @@ final class Conv extends Base
 
 	public function run()
 	{
-		$encoding = $this->params[0] ?? 'win';
+		$encoding = $this->params[0] ?? 'utf';
 		$onlyCurrentDir = !empty($this->params[1]) && ($this->params[1] == '.');
 
 		$onlyExtensions = array_map('trim', array_filter(explode(',', $this->params[2] ?? '')));

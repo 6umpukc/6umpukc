@@ -140,23 +140,26 @@ final class Snippetsgenerate extends Base
 					$wtSnippets[] = $wtCommand;
 				}
 
-				// coolect php console snippets
-				$bitrixPhpConsoleCommand = $this->convertToBitrixPhpConsoleSnippet($command);
-				if (!empty($bitrixPhpConsoleCommand))
+				// collect php console snippets
+				if (!str_starts_with($command['command'], 'bx '))
 				{
-					$bitrixPhpConsoleSnippets[] = $bitrixPhpConsoleCommand;
+					$bitrixPhpConsoleCommand = $this->convertToBitrixPhpConsoleSnippet($command);
+					if (!empty($bitrixPhpConsoleCommand))
+					{
+						$bitrixPhpConsoleSnippets[] = $bitrixPhpConsoleCommand;
+					}
 				}
 			}
 		}
 
 		file_put_contents(
 			$this->getDevPath('windows_terminal_snippets.json'),
-			json_encode($wtSnippets, JSON_PRETTY_PRINT)
+			json_encode($wtSnippets, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
 		);
 
 		file_put_contents(
 			$this->getDevPath('bitrix_php_console_snippets.json'),
-			json_encode($bitrixPhpConsoleSnippets, JSON_PRETTY_PRINT)
+			json_encode($bitrixPhpConsoleSnippets, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
 		);
 
 		echo 'Snippets generated to ' . $this->getDevPath() . "\n";

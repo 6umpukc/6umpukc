@@ -4,8 +4,6 @@ namespace Rodzeta\Siteoptions\Action;
 
 use Rodzeta\Siteoptions\Base;
 
-//TODO!!!
-
 final class Helpgenerate extends Base
 {
 	public function getName()
@@ -36,11 +34,17 @@ final class Helpgenerate extends Base
 
 	public function getDocCommandDescription($name, $command)
 	{
-		// $command['class'];
+		$tmp = explode("\n", $command['descr']);
+		$title = array_shift($tmp);
+		if (trim($title) == '')
+		{
+			return '';
+		}
 
-		$title = '# bx ' . mb_strtolower($name) . "\n\n";
+		$command = 'bx ' . mb_strtolower($name);
 
-		return $title . $command['descr'] . "\n";
+		return '## ' . $title . "\n\n"
+			. '`' . $command . '`' . "\n\n";
 	}
 
 	public function run()
@@ -51,7 +55,12 @@ final class Helpgenerate extends Base
 
 		foreach ($this->getCommands() as $name => $command)
 		{
-			file_put_contents($destFilePath, $this->getDocCommandDescription($name, $command), FILE_APPEND);
+			$commandDescription = $this->getDocCommandDescription($name, $command);
+			if ($commandDescription == '')
+			{
+				continue;
+			}
+			file_put_contents($destFilePath, $commandDescription, FILE_APPEND);
 		}
 
 		echo 'Generated to ' . $destFilePath . "\n";

@@ -16,6 +16,7 @@ final class Gitbackup extends Base
 	{
 		return 'bx ' . $this->getName() . ' - Скопировать и заархивировать git репозитарии по списку' . "\n"
 			. Shell::getDisplayEnvVariable('BX_BACKUP_GIT_REPOS_DEST')
+			. Shell::getDisplayEnvVariable('BX_BACKUP_GIT_REPOS_DEST_ARCHIVED')
 			. Shell::getDisplayEnvVariable('BX_BACKUP_GIT_REPOS');
 	}
 
@@ -23,6 +24,8 @@ final class Gitbackup extends Base
 	{
 		$repos = Shell::getValues($_SERVER['BX_BACKUP_GIT_REPOS'] ?? '');
 		$destPath = Shell::getReplacedEnvVariables($_SERVER['BX_BACKUP_GIT_REPOS_DEST'] ?? '');
+		$destPathArchived = Shell::getReplacedEnvVariables(
+			$_SERVER['BX_BACKUP_GIT_REPOS_DEST_ARCHIVED'] ?? ($destPath . '/.archived/'));
 
 		if (empty($destPath))
 		{
@@ -33,11 +36,9 @@ final class Gitbackup extends Base
 		{
 			mkdir($destPath);
 		}
-
-		$destPathArchived = $destPath . '/.archived/';
 		if (!is_dir($destPathArchived))
 		{
-			mkdir($destPathArchived);
+			mkdir($destPathArchived, 0777, true);
 		}
 
 		chdir($destPath);
@@ -49,7 +50,17 @@ final class Gitbackup extends Base
 
 			$name = $this->git->getName($repo);
 			$path = $destPath . '/' . $name;
-			$archivePath = $destPathArchived . $name . '.tar';
+
+			if (str_starts_with($name, '.'))
+			{
+				$fname = '_' . mb_substr($name, 1);
+			}
+			else
+			{
+				$fname = $name;
+			}
+			$fname .= '.tar';
+			$archivePath = $destPathArchived . $fname;
 
 			chdir($destPath);
 
@@ -58,8 +69,7 @@ final class Gitbackup extends Base
 				chdir($path);
 				Shell::runGetContent('git pull', $resultGitPull);
 
-				if ((mb_strpos($resultGitPull, 'Already up to date') !== false)
-					|| (mb_strpos($resultGitPull, 'Уже актуально') !== false))
+				if ($this->isActualStatus($resultGitPull))
 				{
 					if (file_exists($archivePath))
 					{
@@ -78,5 +88,11 @@ final class Gitbackup extends Base
 
 			echo "\n";
 		}
+	}
+
+	protected function isActualStatus($resultGitPull)
+	{
+		return (mb_strpos($resultGitPull, 'Already up to date') !== false)
+			|| (mb_strpos($resultGitPull, 'Уже актуально') !== false);
 	}
 }

@@ -1396,16 +1396,21 @@ sub download_by_url {
   	}
 }
 
-sub download_by_urls {
-	my @urls = @_;
+sub get_dev_path {
+	return dirname($RealBin) . '/.dev/';
+}
 
+sub download_by_urls {
+	my $surls = shift;
+	my $destPath = shift;
+
+	my @urls = split(/\n/, $surls);
 	for my $srcUrl (@urls) {
 		$srcUrl = trim($srcUrl);
 		if ($srcUrl eq '') {
 			next;
 		}
-
-		my $outputFile = dirname($RealBin) . '/.dev/' . basename($srcUrl);
+		my $outputFile = $destPath . basename($srcUrl);
 		download_by_url($srcUrl, $outputFile);
 	}
 }
@@ -1440,7 +1445,10 @@ sub action_fetch {
 	} elsif ($edition eq 'test') {
 		$outputFile = 'bitrix_server_test.php';
 	} elsif ($edition eq 'docs') {
-		download_by_urls(split(/\n/, $urlEditions{$edition}));
+		download_by_urls(
+			$urlEditions{$edition},
+			defined($ENV{'BX_DOCS_DEST'}) ? $ENV{'BX_DOCS_DEST'} : get_dev_path(),
+		);
 		return;
 	} elsif ($edition eq 'micro') {
 		$extractOptions = './bitrix/modules';
@@ -1575,7 +1583,8 @@ sub action_env {
 		say "\t" . get_putty_command(1);
 		say "\t" . putty_exec_remote('', 1);
 
-		say "\t" . get_filezilla_command(ftp_conn_str(), $basePath);
+		say "\t" . (is_mingw() || is_wsl()? 'start ' : '')
+			. get_filezilla_command(ftp_conn_str(), $basePath);
 
 		say '';
 	}
@@ -1765,7 +1774,7 @@ my $action = '';
 if (scalar @ARGV > 0) {
 	$action = $ARGV[0];
 } else {
-	$action = 'help';
+	$action = 'env';
 }
 if ($action ne '') {
 	if (exists $actions{$action}) {

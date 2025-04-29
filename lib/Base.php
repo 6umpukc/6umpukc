@@ -114,13 +114,7 @@ class Base
 
 	protected function getPublicPath()
 	{
-		$prefix = Config::getPublicPrefix();
-		if (mb_substr($prefix, -1) == '/')
-		{
-			$prefix = mb_substr($prefix, 0, mb_strlen($prefix) - 1);
-		}
-
-		return $this->siteRootPath . $prefix;
+		return $this->siteRootPath;
 	}
 
 	protected function getSiteHost()

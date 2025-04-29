@@ -74,11 +74,6 @@ final class Config
 		return $result;
 	}
 
-	public static function getPublicPrefix()
-	{
-		return $_SERVER['DIR_PUBLIC'] ?? '';
-	}
-
 	public static function getBlock($name, $content)
 	{
 		$begin = '#bx-' . $name . '-begin';

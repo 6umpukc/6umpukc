@@ -69,9 +69,6 @@ sub init_default_env {
 
 	$ENV{'BX_MKCERT'} = 'bx.local *.bx.local';
 
-	#$ENV{'DIR_PUBLIC'} = '/public/';
-	$ENV{'DIR_PUBLIC'} = '/';
-
 	#$ENV{'SITE_DIR_USER'} = 'www-data:www-data';
 	$ENV{'SITE_DIR_RIGHTS'} = '0775';
 

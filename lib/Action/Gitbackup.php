@@ -50,7 +50,17 @@ final class Gitbackup extends Base
 
 			$name = $this->git->getName($repo);
 			$path = $destPath . '/' . $name;
-			$archivePath = $destPathArchived . $name . '.tar';
+
+			if (str_starts_with($name, '.'))
+			{
+				$fname = '_' . mb_substr($name, 1);
+			}
+			else
+			{
+				$fname = $name;
+			}
+			$fname .= '.tar';
+			$archivePath = $destPathArchived . $fname;
 
 			chdir($destPath);
 

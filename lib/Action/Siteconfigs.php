@@ -162,5 +162,21 @@ final class Siteconfigs extends Base
 		chdir($destBasePath);
 		echo 'Changes on ' . $destBasePath . "\n";
 		system('git status');
+
+		$this->makeArchive();
+	}
+
+	protected function makeArchive()
+	{
+		$destBasePath = $this->destBasePath;
+
+		$destPath = Shell::getReplacedEnvVariables($_SERVER['BX_BACKUP_GIT_REPOS_DEST'] ?? '');
+		$destPathArchived = Shell::getReplacedEnvVariables(
+			$_SERVER['BX_BACKUP_GIT_REPOS_DEST_ARCHIVED'] ?? ($destPath . '/.archived/'));
+
+		echo "\n" . $destPathArchived . "\n";
+
+		$archivePath = $destPathArchived . '_tmpenv.tar';
+		Shell::tarCreate($archivePath, $destBasePath);
 	}
 }

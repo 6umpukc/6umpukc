@@ -362,11 +362,20 @@ sub download_binaries {
 	return $outputFile;
 }
 
+sub require_path {
+	my $path = shift;
+	my $message = shift || "Path [$path] not exists.\n";
+	if ($path eq '') {
+		die $message;
+	}
+	if (!(-d $path) && !(-f $path)) {
+		die $message;
+	}
+}
+
 sub require_site_root {
 	my $basePath = shift;
-	if ($basePath eq '') {
-		die "Site root not found.\n";
-	}
+	require_path($basePath, "Site root [$basePath] not found.\n");
 }
 
 sub ftp_conn_str {
@@ -1674,6 +1683,18 @@ sub action_solution_links {
 	}
 }
 
+sub action_site_links {
+	my $srcPath = get_env('BX_SITE_ROOT');
+	require_path($srcPath, "BX_SITE_ROOT [$srcPath] not exists.");
+
+	#TODO создает символьные ссылки в корне сайта /bitrix, /local и /upload
+	#	https://dev.1c-bitrix.ru/learning/course/?COURSE_ID=103&TYPE=Y#LE287
+	# в BX_SITE_ROOT=указывается полный путь к ядру сайта bitrix
+	# ln -s $BX_SITE_ROOT/bitrix $SITE_ROOT/bitrix
+	# ln -s $BX_SITE_ROOT/local $SITE_ROOT/local
+	# ln -s $BX_SITE_ROOT/upload $SITE_ROOT/upload
+}
+
 sub action_upgrade {
 	say '';
 	say 'Update from apt ...';
@@ -1759,6 +1780,10 @@ my %actions = (
 
 	'solution-links' => {
 		'fn' => \&action_solution_links,
+	},
+
+	'site-links' => {
+		'fn' => \&action_site_links,
 	},
 
 	'minify' => {

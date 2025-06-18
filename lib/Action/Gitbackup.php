@@ -67,7 +67,9 @@ final class Gitbackup extends Base
 			if (is_dir($path))
 			{
 				chdir($path);
-				Shell::runGetContent('git pull', $resultGitPull);
+				Shell::runGetContent('git remote update');
+				Shell::runGetContent('git fetch --all');
+				Shell::runGetContent('git pull --all', $resultGitPull);
 
 				if ($this->isActualStatus($resultGitPull))
 				{

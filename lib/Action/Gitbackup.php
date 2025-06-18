@@ -46,9 +46,21 @@ final class Gitbackup extends Base
 
 		foreach ($repos as $repo)
 		{
-			echo "Clone $repo ...\n";
+			$tmp = explode(';', $repo);
+			$repo = $tmp[0];
+			$branch = $tmp[1] ?? '';
+			$dir = $tmp[2] ?? '';
 
-			$name = $this->git->getName($repo);
+			if (!empty($dir))
+			{
+				echo "Clone $repo [$branch] to $dir ...\n";
+			}
+			else
+			{
+				echo "Clone $repo ...\n";
+			}
+
+			$name = !empty($dir)? $dir : $this->git->getName($repo);
 			$path = $destPath . '/' . $name;
 
 			if (str_starts_with($name, '.'))
@@ -67,7 +79,13 @@ final class Gitbackup extends Base
 			if (is_dir($path))
 			{
 				chdir($path);
-				Shell::runGetContent('git pull', $resultGitPull);
+				Shell::runGetContent('git remote update');
+				Shell::runGetContent('git fetch --all');
+				Shell::runGetContent('git pull --all', $resultGitPull);
+				if (!empty($branch))
+				{
+					Shell::run('git checkout ' . $branch);
+				}
 
 				if ($this->isActualStatus($resultGitPull))
 				{
@@ -80,11 +98,21 @@ final class Gitbackup extends Base
 			else
 			{
 				chdir($destPath);
-				Shell::run('git clone ' . $repo);
+				Shell::run('git clone ' . $repo . ($dir? (' ' . $path) : ''));
+				if (!empty($branch))
+				{
+					chdir($path);
+					Shell::run('git checkout ' . $branch);
+					chdir($destPath);
+				}
 				//Shell::run('git clone --mirror ' . $repo . ' ' . $path);
 			}
 
-			Shell::tarCreate($archivePath, $path);
+
+			if (is_dir($destPathArchived))
+			{
+				Shell::tarCreate($archivePath, $path);
+			}
 
 			echo "\n";
 		}

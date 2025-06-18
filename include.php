@@ -1,5 +1,9 @@
 <?php
 
+//TODO!!! реализовать в виде команд
+// > https://dev.1c-bitrix.ru/learning/course/index.php?COURSE_ID=43&LESSON_ID=11685&LESSON_PATH=3913.3516.4776.2483.11685
+// > С версии main 24.0.0 появится возможность добавлять свои команды через файлы настроек модуля {moduleName}/.settings.php. Команды модуля перечисляются в секции console:
+
 namespace Rodzeta\Siteoptions;
 
 use Throwable;
